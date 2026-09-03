@@ -1,5 +1,5 @@
 -- project-x initial schema
--- PostgreSQL 15 / Supabase
+-- PostgreSQL 17 / Supabase
 -- Money is integer cents. The ONLY wallet mutation path is apply_ledger_entry().
 
 create extension if not exists pgcrypto;
@@ -8,52 +8,68 @@ create extension if not exists pgcrypto;
 -- Enums
 -- ---------------------------------------------------------------------------
 
-create type user_status as enum ('active', 'suspended', 'banned');
+do $$ begin
+  create type user_status as enum ('active', 'suspended', 'banned');
+exception when duplicate_object then null; end $$;
 
-create type ledger_entry_type as enum (
-  'WAGER_DEBIT',
-  'STREAK_WAGER_DEBIT',
-  'WAGER_REFUND',
-  'DRAW_REFUND',
-  'MATCH_TIMEOUT_REFUND',
-  'PAYOUT_CREDIT',
-  'STREAK_PAYOUT_CREDIT',
-  'ADMIN_CREDIT',
-  'ADMIN_DEBIT'
-);
+do $$ begin
+  create type ledger_entry_type as enum (
+    'WAGER_DEBIT',
+    'STREAK_WAGER_DEBIT',
+    'WAGER_REFUND',
+    'DRAW_REFUND',
+    'MATCH_TIMEOUT_REFUND',
+    'PAYOUT_CREDIT',
+    'STREAK_PAYOUT_CREDIT',
+    'ADMIN_CREDIT',
+    'ADMIN_DEBIT'
+  );
+exception when duplicate_object then null; end $$;
 
-create type match_mode as enum ('pvp_1v1', 'streak');
+do $$ begin
+  create type match_mode as enum ('pvp_1v1', 'streak');
+exception when duplicate_object then null; end $$;
 
-create type match_status as enum (
-  'pending',
-  'live',
-  'open',
-  'paired',
-  'settled',
-  'timeout_refunded',
-  'void'
-);
+do $$ begin
+  create type match_status as enum (
+    'pending',
+    'live',
+    'open',
+    'paired',
+    'settled',
+    'timeout_refunded',
+    'void'
+  );
+exception when duplicate_object then null; end $$;
 
-create type match_player_status as enum (
-  'pending',
-  'running',
-  'scored',
-  'zeroed_timeout',
-  'settled'
-);
+do $$ begin
+  create type match_player_status as enum (
+    'pending',
+    'running',
+    'scored',
+    'zeroed_timeout',
+    'settled'
+  );
+exception when duplicate_object then null; end $$;
 
-create type boost_type as enum ('prize_boost');
+do $$ begin
+  create type boost_type as enum ('prize_boost');
+exception when duplicate_object then null; end $$;
 
-create type boost_status as enum ('available', 'consumed', 'expired');
+do $$ begin
+  create type boost_status as enum ('available', 'consumed', 'expired');
+exception when duplicate_object then null; end $$;
 
-create type streak_status as enum ('active', 'won', 'lost', 'cashed_out');
+do $$ begin
+  create type streak_status as enum ('active', 'won', 'lost', 'cashed_out');
+exception when duplicate_object then null; end $$;
 
 -- ---------------------------------------------------------------------------
 -- users
 -- Firebase Auth is the identity provider. firebase_uid is the stable external id.
 -- ---------------------------------------------------------------------------
 
-create table users (
+create table if not exists users (
   id uuid primary key default gen_random_uuid(),
   firebase_uid text not null,
   display_name text,
@@ -71,7 +87,7 @@ create table users (
 -- apply_ledger_entry().
 -- ---------------------------------------------------------------------------
 
-create table wallets (
+create table if not exists wallets (
   user_id uuid primary key references users (id) on delete restrict,
   balance_cents bigint not null default 0,
   lock_version integer not null default 0,
@@ -87,7 +103,7 @@ create table wallets (
 -- a separate mode = 'pvp_1v1' match.
 -- ---------------------------------------------------------------------------
 
-create table matches (
+create table if not exists matches (
   id uuid primary key default gen_random_uuid(),
   game_id text not null default 'basketball_v1',
   mode match_mode not null,
@@ -120,7 +136,7 @@ create table matches (
 -- now() + ttl_seconds (see Functions; columns exist to make that atomic).
 -- ---------------------------------------------------------------------------
 
-create table boosts (
+create table if not exists boosts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references users (id) on delete restrict,
   boost_type boost_type not null default 'prize_boost',
@@ -153,7 +169,7 @@ create table boosts (
 -- zeroed_for_disconnect = true.
 -- ---------------------------------------------------------------------------
 
-create table match_players (
+create table if not exists match_players (
   id uuid primary key default gen_random_uuid(),
   match_id uuid not null references matches (id) on delete restrict,
   user_id uuid not null references users (id) on delete restrict,
@@ -196,7 +212,7 @@ create table match_players (
 -- multiplier_bps: 10000 = 1.00x, 25000 = 2.50x. Payout uses floor().
 -- ---------------------------------------------------------------------------
 
-create table streaks (
+create table if not exists streaks (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references users (id) on delete restrict,
   stake_cents bigint not null,
@@ -223,6 +239,8 @@ create table streaks (
 );
 
 alter table matches
+  drop constraint if exists matches_seeded_from_streak_id_fkey;
+alter table matches
   add constraint matches_seeded_from_streak_id_fkey
   foreign key (seeded_from_streak_id) references streaks (id) on delete restrict;
 
@@ -234,7 +252,7 @@ alter table matches
 -- unique row key (may be derived when one request writes several entries).
 -- ---------------------------------------------------------------------------
 
-create table ledger (
+create table if not exists ledger (
   id uuid primary key default gen_random_uuid(),
   wallet_user_id uuid not null references wallets (user_id) on delete restrict,
   entry_type ledger_entry_type not null,
@@ -279,33 +297,33 @@ create table ledger (
 -- Indexes
 -- ---------------------------------------------------------------------------
 
-create index ledger_wallet_created_at_idx
+create index if not exists ledger_wallet_created_at_idx
   on ledger (wallet_user_id, created_at desc);
 
-create index matches_open_pool_idx
+create index if not exists matches_open_pool_idx
   on matches (game_id, stake_cents, created_at)
   where status = 'open';
 
-create index matches_matchmaking_expiry_idx
+create index if not exists matches_matchmaking_expiry_idx
   on matches (matchmaking_expires_at)
   where status = 'open';
 
-create index match_players_score_deadline_idx
+create index if not exists match_players_score_deadline_idx
   on match_players (score_deadline_at)
   where status = 'running';
 
-create index match_players_user_id_idx
+create index if not exists match_players_user_id_idx
   on match_players (user_id, created_at desc);
 
-create index boosts_available_idx
+create index if not exists boosts_available_idx
   on boosts (user_id, expires_at)
   where status = 'available';
 
-create unique index streaks_one_active_per_user_idx
+create unique index if not exists streaks_one_active_per_user_idx
   on streaks (user_id)
   where status = 'active';
 
-create index streaks_user_id_idx
+create index if not exists streaks_user_id_idx
   on streaks (user_id, created_at desc);
 
 -- ---------------------------------------------------------------------------
@@ -322,27 +340,27 @@ begin
 end;
 $$;
 
-create trigger users_set_updated_at
+create or replace trigger users_set_updated_at
   before update on users
   for each row execute function set_updated_at();
 
-create trigger wallets_set_updated_at
+create or replace trigger wallets_set_updated_at
   before update on wallets
   for each row execute function set_updated_at();
 
-create trigger matches_set_updated_at
+create or replace trigger matches_set_updated_at
   before update on matches
   for each row execute function set_updated_at();
 
-create trigger match_players_set_updated_at
+create or replace trigger match_players_set_updated_at
   before update on match_players
   for each row execute function set_updated_at();
 
-create trigger boosts_set_updated_at
+create or replace trigger boosts_set_updated_at
   before update on boosts
   for each row execute function set_updated_at();
 
-create trigger streaks_set_updated_at
+create or replace trigger streaks_set_updated_at
   before update on streaks
   for each row execute function set_updated_at();
 
@@ -360,7 +378,7 @@ begin
 end;
 $$;
 
-create trigger users_create_wallet
+create or replace trigger users_create_wallet
   after insert on users
   for each row execute function users_create_wallet();
 
@@ -387,7 +405,7 @@ begin
 end;
 $$;
 
-create trigger matches_set_matchmaking_window
+create or replace trigger matches_set_matchmaking_window
   before insert or update of status on matches
   for each row execute function matches_set_matchmaking_window();
 
@@ -404,7 +422,7 @@ begin
 end;
 $$;
 
-create trigger match_players_set_score_deadline
+create or replace trigger match_players_set_score_deadline
   before insert or update of started_at on match_players
   for each row execute function match_players_set_score_deadline();
 
@@ -449,7 +467,7 @@ begin
 end;
 $$;
 
-create trigger match_players_enforce_match_rules
+create or replace trigger match_players_enforce_match_rules
   before insert or update of match_id, seat, stake_cents on match_players
   for each row execute function match_players_enforce_match_rules();
 
@@ -466,11 +484,11 @@ begin
 end;
 $$;
 
-create trigger ledger_forbid_update
+create or replace trigger ledger_forbid_update
   before update on ledger
   for each row execute function ledger_forbid_mutation();
 
-create trigger ledger_forbid_delete
+create or replace trigger ledger_forbid_delete
   before delete on ledger
   for each row execute function ledger_forbid_mutation();
 
@@ -486,7 +504,7 @@ begin
 end;
 $$;
 
-create trigger wallets_forbid_nonzero_insert
+create or replace trigger wallets_forbid_nonzero_insert
   before insert on wallets
   for each row execute function wallets_forbid_nonzero_insert();
 
@@ -502,7 +520,7 @@ begin
 end;
 $$;
 
-create trigger wallets_require_ledger_function
+create or replace trigger wallets_require_ledger_function
   before update on wallets
   for each row execute function wallets_require_ledger_function();
 
@@ -518,7 +536,7 @@ begin
 end;
 $$;
 
-create trigger ledger_require_apply_function
+create or replace trigger ledger_require_apply_function
   before insert on ledger
   for each row execute function ledger_require_apply_function();
 

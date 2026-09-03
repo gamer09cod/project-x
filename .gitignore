@@ -55,6 +55,8 @@ Thumbs.db
 .vscode/
 *.swp
 
+firebase-debug.log
+
 # Cursor agent routing (local; not committed)
 AGENTS.md
 .cursor/skills/

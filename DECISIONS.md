@@ -2,7 +2,7 @@
 
 Locked during project scaffolding (3 September 2026). New decisions append below; do not silently rewrite history — strike and replace with a dated entry.
 
-Related: [`README.md`](README.md), [`docs/architecture/VERSION_MATRIX.md`](docs/architecture/VERSION_MATRIX.md), [`docs/architecture/BOUNDARIES.md`](docs/architecture/BOUNDARIES.md), [`docs/schema/SCHEMA.md`](docs/schema/SCHEMA.md).
+Related: [`README.md`](README.md), [`docs/architecture/VERSION_MATRIX.md`](docs/architecture/VERSION_MATRIX.md), [`docs/architecture/BOUNDARIES.md`](docs/architecture/BOUNDARIES.md), [`docs/schema/SCHEMA.md`](docs/schema/SCHEMA.md), [`docs/backend/REQUIREMENTS.md`](docs/backend/REQUIREMENTS.md).
 
 ---
 
@@ -15,11 +15,12 @@ The client (Unity + React Native) is untrusted. The attacker is a modified APK/I
 | Asset | Why it matters |
 |---|---|
 | `wallets.balance_cents` | Real money, integer cents |
+| `users.rating` | Display only; must not affect pairing |
 | `ledger` | Append-only audit of every debit/credit |
 | Match outcome / `score_payload` | Determines payouts |
 | Boost inventory | Paid (or granted) items that change EV |
 | Firebase Auth session | Maps to `users.firebase_uid` |
-| Supabase service role key | Bypasses RLS; never on device |
+| `DATABASE_URL` | Direct Postgres; never on device |
 
 ### 1.2 Actors
 
@@ -31,27 +32,31 @@ The client (Unity + React Native) is untrusted. The attacker is a modified APK/I
 | PostgreSQL | Trusted store. Enforces cents, append-only ledger, wallet write guard. |
 | Scheduled jobs | Trusted. 15-minute matchmaking refund; 75-second zero-score. |
 
-### 1.3 Threats and scaffolding controls
+### 1.3 Threats (concrete)
 
-| Threat | Control (in repo now) | Still open |
-|---|---|---|
-| Fake score | Server is the only writer of `match_players.score`; payload stored for audit | Payload verification methodology (section 3) |
-| Replay `joinMatch` / `submitScore` | Unique `join_idempotency_key`, `submit_idempotency_key`, `ledger.idempotency_key` | Callable contracts (Step 3) |
-| Crash after debit, no submit | Debit at `started_at`; `score_deadline_at = started_at + 75s`; cron zeros score | Cron implementation |
-| Sit in the 1v1 pool forever | `matchmaking_expires_at = opened_at + 15 minutes`; `MATCH_TIMEOUT_REFUND`; no auto-win | Cron implementation |
-| Direct table writes from the phone | RLS on; `anon`/`authenticated` revoked; v1 is `service_role` only | Firebase JWT → optional later read path |
-| Wallet update without ledger | Triggers: ledger insert + wallet update only via `apply_ledger_entry()` | — |
-| Float rounding theft | `bigint` cents; `Math.floor` in Functions before ledger; house keeps fraction | Enforce floor in shared helper (no UI) |
-| Self-match vs own streak seed | `(match_id, user_id)` unique | Matchmaking must not pair the same `user_id` |
-| Infinite buzzer-beater | Unity flag `hasUsedBuzzerBeater` (gameplay later); payload field in section 3 | Unity + verifier |
-| Boost kept after a draw | Draw restores boost to `available` and resets `expires_at`; `DRAW_REFUND` for the stake | Callable settlement |
+| Threat | How someone cheats | Control | Holes |
+|---|---|---|---|
+| Fake score | Memory-edit Unity; send `score: 999` | Reconstruct from `shotLog`; mismatch → 0 | Internally consistent fake logs |
+| Slowed clock | Stretch the process so more shots fit in “60s” | `durationMs` ≤ `MAX_DURATION_MS` (67s) | Cheats inside the cap |
+| Infinite buzzer-beater | Trigger +5s repeatedly | At most one buzzer-beater event | Lie in the log if it stays consistent |
+| Replay | Double-tap join/submit | Unique `idempotency_key`s | Stolen key still needs that user’s token |
+| Modified build | Sideloaded APK with auto-aim | `unityBuildId` allowlist (Phase 9) | Until then, any build is accepted |
+| Scripted input | Perfect bot in a legit build | None in v1 | Next week: heuristics |
+| Crash-scum | Kill app after debit | 75s cron zeros score | Delay right at the deadline |
+| Pool timeout theft | Never get an opponent, keep the stake | 15m `MATCH_TIMEOUT_REFUND`; rating unchanged | — |
+| Direct table writes | Stolen client key | RLS deny-all; Functions use `pg` + `DATABASE_URL` | Leaked DB URL is game over |
+| Wallet without ledger | Raw `UPDATE wallets` | `apply_ledger_entry` only | — |
 
-### 1.4 Out of scope for v1 scaffolding
+**First defence to ship (Phase 7):** duration cap + monotone `shotLog` + reconstruct vs claimed score. It catches inflated scores that do not match the log, extra buzzer-beaters, and over-long runs. It does **not** catch a bot that plays a legal log, or a patched client that forges a coherent log.
 
-- Payment processor / cash-out rails
+**Next week (order):** `unityBuildId` fail-closed → App Check on all money callables → submit rate limits → simple shot-timing heuristics.
+
+### 1.4 Out of scope for v1
+
+- Real payment processor, cards, webhooks (mock `ADMIN_CREDIT` / `ADMIN_DEBIT` only)
 - KYC / geofencing
 - Spectators and public match feeds
-- Device-side Supabase reads
+- Device-side Postgres access
 
 ---
 
@@ -109,7 +114,7 @@ Unity may send any JSON. Functions persist the blob on `match_players.score_payl
 
 ### 3.2 Required payload shape (contract)
 
-Exact TypeScript lands in Step 3. Semantic requirements:
+TypeScript: `packages/shared` (`ScorePayloadV1`). Semantic requirements:
 
 | Field | Rule |
 |---|---|
@@ -132,7 +137,7 @@ Run in order; first failure ⇒ accepted score `0` (same as disconnect), payload
 1. **Schema** — all required fields, types, `score >= 0`.
 2. **Identity** — `clientRunId` matches the running `match_players` row; user is seat holder.
 3. **Once-only buzzer-beater** — at most one event with `buzzerBeaterTriggered`; if `hasUsedBuzzerBeater === false`, there must be zero such events.
-4. **Clock bound** — `durationMs` ≤ 60_000 + 5_000 + slack (small constant, TBD in Step 3, not a second 60s). Multiple +5s extensions are invalid.
+4. **Clock bound** — `durationMs` ≤ 60_000 + 5_000 + 2_000 (`MAX_DURATION_MS`). Multiple +5s extensions are invalid.
 5. **Monotone shot times** — `shotLog[].t` non-decreasing and within `durationMs`.
 6. **Score reconstruction** — claimed `score` must equal the sum implied by `shotLog` under the published scoring table (locked when gameplay is specified). Mismatch ⇒ 0.
 7. **Build allowlist** — `unityBuildId` in the current allowlist (empty allowlist in scaffolding = accept all, fail closed before first paid match).
@@ -164,11 +169,17 @@ If checks pass, write `match_players.score` from the reconstructed integer, `sta
 | A5 | Unity | 6000.1.13f1 (user lock) | 6.3 LTS, 6.0 LTS, 2022.3 |
 | A6 | RN ↔ Unity | `@azesmway/react-native-unity` 1.1.1; source in `/unity`, exports in `mobile/unity/builds/` | Expo Unity plugins |
 | A7 | Auth | Firebase Auth via RNFirebase 26.3.3 | Firebase JS SDK on device, Supabase Auth |
-| A8 | API | Firebase Functions 7.3.2, Node 22, admin 14.3.0 | Supabase Edge Functions as money API |
-| A9 | Database | Supabase PostgreSQL 15 | Firestore as source of truth |
-| A10 | Client DB access | Deny-all RLS; Functions `service_role` only | Anon read of wallets |
+| A8 | API | Firebase Functions 7.3.2, Node 22, **JavaScript**, admin 14.3.0 | TypeScript Functions, Supabase Edge Functions as money API |
+| A9 | Database | ~~Supabase-hosted PostgreSQL 15~~ **replaced 3 Sep 2026 by A9b** | Firestore as source of truth |
+| A9b | Database | Supabase-hosted PostgreSQL 17 (live `17.6.1.166`) | PostgreSQL 15 (no longer offered on new hosted projects) |
+| A10 | Client DB access | ~~service_role via supabase-js~~ **replaced 3 Sep 2026 by A13** | Anon read of wallets |
 | A11 | Money writes | `apply_ledger_entry()` only | ORM updates to `wallets` |
 | A12 | Identity PK | Internal `users.id` uuid; `firebase_uid` unique | Firebase UID as PK |
+| A13 | Functions → Postgres | `pg` + `query`/`transaction` in `db.js`; `PG_*` / direct 5432 | `@supabase/supabase-js`, ORMs, query builders, TypeScript in Functions |
+| A14 | Matchmaking | FCFS same `game_id` + `stake_cents`; rating ignored | ELO-based pairing |
+| A15 | Nobody in 15m window | `MATCH_TIMEOUT_REFUND`; no auto-win; no house bot | Silent keep of stake |
+| A16 | Rating | Start 1000; win +20; loss −20 (min 0); draw/timeout 0 | K-factor, provisionals, tiers |
+| A17 | Payments | Mock `ADMIN_CREDIT` / `ADMIN_DEBIT` only | Stripe/cards/webhooks |
 
 ---
 
@@ -183,15 +194,29 @@ If checks pass, write `match_players.score` from the reconstructed integer, `sta
 | S5 | Streak pool seed | Separate `pvp_1v1` match, not a status on the PvE row |
 | S6 | One active streak | Unique index on `streaks.user_id` where `status = 'active'` |
 | S7 | Player caps | Trigger: streak = 1 player (seat 1); 1v1 ≤ 2 |
+| S8 | Rating | `users.rating integer not null default 1000 check (>= 0)` |
 
-SQL: `backend/supabase/migrations/0001_init.sql`.
+SQL: `backend/supabase/migrations/20260903120000_init.sql` plus `20260903140000_player_rating.sql`.
+
+Step 2 schema **approved** 3 September 2026.
 
 ---
 
-## 6. Open items (not decided)
+## 6. API contract decisions (Step 3)
 
-- Exact `durationMs` slack constant for section 3.3.4
+| ID | Decision | Choice |
+|---|---|---|
+| C1 | `durationMs` slack | `SCORE_DURATION_SLACK_MS = 2000`. Max duration = 60s + 5s buzzer-beater + 2s. |
+| C2 | Payload schema | `ScorePayloadV1`, `schemaVersion: 1`, in `packages/shared` |
+| C3 | Streak boosts | `startStreak` does not take `boostId`. Prize boosts are 1v1 `joinMatch` only in v1. |
+| C4 | Target / multiplier | `targetScore` and `multiplierBps` are server-assigned on `startStreak` |
+
+Callable TS: `packages/shared/src/api`. Narrative: `docs/api/CONTRACTS.md`.
+
+---
+
+## 7. Open items (not decided)
+
 - Published shot scoring table (gameplay not specified)
 - `unityBuildId` allowlist process
-- Payment rails / cash-out
 - Whether New Architecture stays on after the first `UnityView` device spike

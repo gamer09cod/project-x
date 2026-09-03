@@ -1,13 +1,13 @@
 # Database schema (Step 2)
 
-Source of truth: `backend/supabase/migrations/0001_init.sql`.
-PostgreSQL 15. All money columns are `bigint` integer cents (`$1.25 = 125`).
+Source of truth: `backend/supabase/migrations/20260903120000_init.sql`.
+PostgreSQL 17. All money columns are `bigint` integer cents (`$1.25 = 125`).
 
 ## Tables
 
 | Table | Cardinality | Role |
 |---|---|---|
-| `users` | 1 per Firebase account | Profile. `firebase_uid` unique. |
+| `users` | 1 per Firebase account | Profile. `firebase_uid` unique. `rating` starts at 1000. |
 | `wallets` | 1:1 with `users` | `balance_cents` cache. Inserted at 0 by trigger. |
 | `ledger` | append-only | Every balance change. Signed `delta_cents`. |
 | `matches` | 1 per run or pool posting | `pvp_1v1` or `streak`. |
@@ -15,7 +15,7 @@ PostgreSQL 15. All money columns are `bigint` integer cents (`$1.25 = 125`).
 | `boosts` | inventory instances | `prize_boost` with `bonus_bps` (1500 = +15%). |
 | `streaks` | 1 active per user | PvE run + pointer to injected open 1v1. |
 
-Device roles (`anon`, `authenticated`) have **no** table grants. RLS is on; v1 access is `service_role` from Firebase Functions only.
+Device roles (`anon`, `authenticated`) have **no** table grants. RLS is on; v1 access is Firebase Functions using `pg` + `DATABASE_URL` only.
 
 ## Money path
 
@@ -31,7 +31,7 @@ Idempotency: `ledger.idempotency_key` is unique (row key, may be derived). `(cli
 
 | Rule | Encoded as |
 |---|---|
-| 15 minute open-match timeout | `matches` entering `open` sets `opened_at` and `matchmaking_expires_at = opened_at + 15 minutes`. Cron refunds with `MATCH_TIMEOUT_REFUND`. No auto-win. |
+| 15 minute open-match timeout | `matches` entering `open` sets `opened_at` and `matchmaking_expires_at = opened_at + 15 minutes`. Cron refunds with `MATCH_TIMEOUT_REFUND`. No auto-win, no house bot. Rating unchanged. |
 | 75 second crash-scum window | Setting `match_players.started_at` sets `score_deadline_at = started_at + 75 seconds`. Cron settles `score = 0`, `zeroed_for_disconnect = true`. |
 | Stake equals match | Trigger: `match_players.stake_cents = matches.stake_cents`. |
 | Streak is 1 player; 1v1 is ≤2 | Trigger on `match_players`. Seat 2 is PvP only. |
@@ -55,4 +55,4 @@ House keeps the fractional cent after `Math.floor`.
 
 ## `score_payload`
 
-`match_players.score_payload jsonb` is an audit blob. Verification methodology (including `hasUsedBuzzerBeater`) is Step 4, not this migration.
+`match_players.score_payload jsonb` is an audit blob. JSON shape: `ScorePayloadV1` in `packages/shared`. Verification order: `DECISIONS.md` §3.3.

@@ -14,6 +14,13 @@
   "scripts": {
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "db:apply": "node backend/functions/scripts/apply-migrations.js",
+    "db:verify": "node backend/functions/scripts/verify-phase2.js",
+    "deploy:functions": "firebase deploy --only functions"
+  },
+  "devDependencies": {
+    "firebase-tools": "15.29.0",
+    "supabase": "2.48.3"
   }
 }

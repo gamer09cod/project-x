@@ -11,14 +11,15 @@ This repo is in **planning / scaffolding**. There is no gameplay or UI implement
 | Node.js / npm | 22.18.0 / 10.9.3 |
 | React Native | 0.86.0 |
 | React | 19.2.3 (exact — renderer mismatch crash otherwise) |
-| TypeScript | 5.9.3 |
+| TypeScript (mobile + `packages/shared` only) | 5.9.3 |
+| Firebase Functions | JavaScript (CommonJS) |
 | `@azesmway/react-native-unity` | 1.1.1 |
 | Unity Editor | 6000.1.13f1 |
 | RNFirebase app / auth / functions / app-check | 26.3.3 |
 | firebase-admin / firebase-functions | 14.3.0 / 7.3.2 |
 | firebase-tools | 15.29.0 |
-| `@supabase/supabase-js` | 2.114.0 |
-| PostgreSQL (Supabase) | 15 |
+| PostgreSQL (Supabase-hosted) | 17 |
+| `pg` (Functions) | 8.16.3 |
 | C# (Unity default) | 9.0 |
 
 Companion `@react-native/*` packages (babel-preset, metro-config, typescript-config, eslint-config, codegen, gradle-plugin) must also be **0.86.0**. Full table: [`docs/architecture/VERSION_MATRIX.md`](docs/architecture/VERSION_MATRIX.md).
@@ -35,13 +36,13 @@ project-x/
   unity/                  Unity 6.1 source (6000.1.13f1)
     Assets/Scripts/{Bridge,Gameplay,AntiCheat}
   backend/
-    functions/            Firebase Functions (Node 22)
+    functions/            Firebase Functions (Node 22, JavaScript)
     supabase/migrations/  PostgreSQL source of truth
-  packages/shared/        TS types shared by mobile and functions
+  packages/shared/        TS types for mobile; JSON contracts for Functions
   docs/
     architecture/         Version matrix, boundaries, architecture diagram
     schema/               Schema narrative
-    api/                  Step 3
+    api/                  Callable contracts
     decisions/            Pointer to root DECISIONS.md
 ```
 
@@ -57,12 +58,16 @@ npm workspaces: `mobile`, `backend/functions`, `packages/shared`. Unity is not a
 
 Boundaries: [`docs/architecture/BOUNDARIES.md`](docs/architecture/BOUNDARIES.md).
 Architecture diagram: [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md).
-Schema: [`docs/schema/SCHEMA.md`](docs/schema/SCHEMA.md) and [`backend/supabase/migrations/0001_init.sql`](backend/supabase/migrations/0001_init.sql).
-Locked product/security decisions: [`DECISIONS.md`](DECISIONS.md).
+Build plan: [`docs/PLAN.md`](docs/PLAN.md).
+Schema: [`docs/schema/SCHEMA.md`](docs/schema/SCHEMA.md) and [`backend/supabase/migrations/20260903120000_init.sql`](backend/supabase/migrations/20260903120000_init.sql).
+API contracts: [`docs/api/CONTRACTS.md`](docs/api/CONTRACTS.md).
+Backend spec: [`docs/backend/REQUIREMENTS.md`](docs/backend/REQUIREMENTS.md).
+Locked decisions: [`DECISIONS.md`](DECISIONS.md).
+Staff skills: [`docs/skills.md`](docs/skills.md).
 
 ## Toolchain
 
-- Node **22.18.0** (`.nvmrc`). `engine-strict=true` and `save-exact=true` in `.npmrc`.
+- Intended Node **22.18.0** (`.nvmrc`); Cloud Functions runtime is `nodejs22`. `save-exact=true` in `.npmrc`. Local Node 24 is allowed for `npm install`.
 - Unity Hub → install editor **6000.1.13f1**, open `/unity`.
 - Export iOS `UnityFramework` and Android `unityLibrary` into `mobile/unity/builds/` (not committed; regenerated from `/unity`).
 

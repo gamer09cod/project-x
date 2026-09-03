@@ -19,7 +19,7 @@ flowchart LR
         crons["Functions timeout and disconnect jobs"]
     end
     subgraph datastore ["System of record"]
-        postgres["Supabase PostgreSQL 15"]
+        postgres["Supabase PostgreSQL 17"]
     end
     subgraph async ["Schedules"]
         scheduler["Cloud Scheduler"]

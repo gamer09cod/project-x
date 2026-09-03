@@ -4,6 +4,14 @@
       "source": "backend/functions",
       "codebase": "default",
       "runtime": "nodejs22",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "test",
+        "scripts",
+        ".env.example"
+      ],
       "predeploy": [
         "node --check backend/functions/src/index.js",
         "node --check backend/functions/src/db.js"
