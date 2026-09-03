@@ -1,0 +1,37 @@
+pluginManagement { includeBuild("../../node_modules/@react-native/gradle-plugin") }
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'com.rmgx.swap'
+include ':app'
+includeBuild('../../node_modules/@react-native/gradle-plugin')
+
+def unityExportDir = new File(settingsDir, '../unity/builds/android')
+def unityLibraryDir = new File(unityExportDir, 'unityLibrary')
+def unityExportProps = new Properties()
+def unityGradlePropsFile = new File(unityExportDir, 'gradle.properties')
+if (unityGradlePropsFile.exists()) {
+    unityGradlePropsFile.withInputStream { unityExportProps.load(it) }
+}
+
+if (unityLibraryDir.exists()) {
+    include ':unityLibrary'
+    project(':unityLibrary').projectDir = unityLibraryDir
+} else {
+    println 'Unity android export missing. Export from /unity into mobile/unity/builds/android before run-android.'
+}
+
+// Unity buildIl2Cpp calls getProperty("unity.androidNdkPath"). The export writes
+// those keys into its own gradle.properties; inject them into every project.
+gradle.beforeProject { project ->
+    unityExportProps.each { key, value ->
+        def name = key.toString()
+        if (!name.startsWith('unity.')) {
+            return
+        }
+        if (!project.hasProperty(name)) {
+            project.extensions.extraProperties.set(name, value.toString())
+        }
+    }
+}
+
+
