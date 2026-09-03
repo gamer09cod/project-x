@@ -5,7 +5,8 @@
       "codebase": "default",
       "runtime": "nodejs22",
       "predeploy": [
-        "npm --prefix backend/functions run typecheck"
+        "node --check backend/functions/src/index.js",
+        "node --check backend/functions/src/db.js"
       ]
     }
   ]

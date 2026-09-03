@@ -54,3 +54,8 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Cursor agent routing (local; not committed)
+AGENTS.md
+.cursor/skills/
+.cursor/rules/

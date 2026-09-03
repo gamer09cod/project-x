@@ -1,22 +1,19 @@
 {
   "name": "functions",
   "private": true,
-  "main": "lib/index.js",
+  "version": "0.0.0",
+  "main": "src/index.js",
   "engines": {
-    "node": "22.18.0"
+    "node": ">=22.18.0"
   },
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "serve": "npm run build && firebase emulators:start --only functions"
+    "test": "node --test test/db.test.js test/schema.test.js test/contracts.test.js",
+    "serve": "firebase emulators:start --only functions"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.114.0",
     "firebase-admin": "14.3.0",
-    "firebase-functions": "7.3.2"
-  },
-  "devDependencies": {
-    "typescript": "5.9.3"
+    "firebase-functions": "7.3.2",
+    "pg": "8.16.3"
   }
 }
