@@ -1,0 +1,56 @@
+# Node
+node_modules/
+npm-debug.log*
+*.tsbuildinfo
+dist/
+lib/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+google-services.json
+GoogleService-Info.plist
+**/serviceAccount*.json
+
+# React Native
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/build/
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/*.jsbundle
+*.hprof
+.cxx/
+
+# Unity editor (source project)
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Oo]bj/
+unity/[Bb]uild/
+unity/[Bb]uilds/
+unity/[Ll]ogs/
+unity/[Uu]ser[Ss]ettings/
+unity/MemoryCaptures/
+unity/*.csproj
+unity/*.sln
+unity/*.pidb
+unity/*.unityproj
+unity/*.suo
+unity/*.user
+unity/*.userprefs
+unity/*.booproj
+unity/CrashReports/
+
+# Unity exports consumed by RN (regenerated from /unity)
+mobile/unity/builds/ios/**
+mobile/unity/builds/android/**
+!mobile/unity/builds/ios/.gitkeep
+!mobile/unity/builds/android/.gitkeep
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
