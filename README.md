@@ -39,7 +39,7 @@ project-x/
     supabase/migrations/  PostgreSQL source of truth
   packages/shared/        TS types shared by mobile and functions
   docs/
-    architecture/         Version matrix + trust boundaries
+    architecture/         Version matrix, boundaries, architecture diagram
     schema/               Schema narrative
     api/                  Step 3
     decisions/            Pointer to root DECISIONS.md
@@ -56,6 +56,7 @@ npm workspaces: `mobile`, `backend/functions`, `packages/shared`. Unity is not a
 5. **Client is untrusted.** Unity and React Native never compute payouts or write the ledger.
 
 Boundaries: [`docs/architecture/BOUNDARIES.md`](docs/architecture/BOUNDARIES.md).
+Architecture diagram: [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md).
 Schema: [`docs/schema/SCHEMA.md`](docs/schema/SCHEMA.md) and [`backend/supabase/migrations/0001_init.sql`](backend/supabase/migrations/0001_init.sql).
 Locked product/security decisions: [`DECISIONS.md`](DECISIONS.md).
 

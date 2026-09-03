@@ -1,0 +1,6 @@
+# Firestore / Realtime DB unused. PostgreSQL 15 is the system of record.
+# Pin is documented in docs/architecture/VERSION_MATRIX.md.
+project_id = "project-x"
+
+[db]
+major_version = 15
