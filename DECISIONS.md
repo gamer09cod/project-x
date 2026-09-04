@@ -166,7 +166,8 @@ If checks pass, write `match_players.score` from the reconstructed integer, `sta
 | A2 | Package manager | npm 10.9.3 workspaces, `save-exact=true` | Yarn/pnpm, floating ranges |
 | A3 | Mobile shell | Bare React Native 0.86.0 | RN 0.87.1, RN 0.86.3, Expo managed |
 | A4 | React | 19.2.3 exact | Any other 19.2.x |
-| A5 | Unity | 6000.1.13f1 (user lock) | 6.3 LTS, 6.0 LTS, 2022.3 |
+| A5 | Unity | ~~6000.1.13f1~~ **replaced 3 Sep 2026 by A5b** | 6.3 LTS, 6.0 LTS, 2022.3 |
+| A5b | Unity | **6000.3.18f1** (editor used for Phase 3 Android export) | 6000.1.13f1 |
 | A6 | RN ↔ Unity | `@azesmway/react-native-unity` 1.1.1; source in `/unity`, exports in `mobile/unity/builds/` | Expo Unity plugins |
 | A7 | Auth | Firebase Auth via RNFirebase 26.3.3 | Firebase JS SDK on device, Supabase Auth |
 | A8 | API | Firebase Functions 7.3.2, Node 22, **JavaScript**, admin 14.3.0 | TypeScript Functions, Supabase Edge Functions as money API |
@@ -180,6 +181,9 @@ If checks pass, write `match_players.score` from the reconstructed integer, `sta
 | A15 | Nobody in 15m window | `MATCH_TIMEOUT_REFUND`; no auto-win; no house bot | Silent keep of stake |
 | A16 | Rating | Start 1000; win +20; loss −20 (min 0); draw/timeout 0 | K-factor, provisionals, tiers |
 | A17 | Payments | Mock `ADMIN_CREDIT` / `ADMIN_DEBIT` only | Stripe/cards/webhooks |
+| A18 | New Architecture | ~~**Off** for azesmway Paper spike~~ **replaced 3 Sep 2026 by A18b** | Fabric on for first embed |
+| A18b | New Architecture | **On** (RN 0.86 / 0.82+ ignores `newArchEnabled=false`). azesmway 1.1.1 Fabric path used; `jcenter()` removed via patch. | Paper-only embed |
+| A19 | Auth provider (Phase 4) | Firebase **email/password** via RNFirebase Auth | Phone auth (deferred) |
 
 ---
 
@@ -219,4 +223,3 @@ Callable TS: `packages/shared/src/api`. Narrative: `docs/api/CONTRACTS.md`.
 
 - Published shot scoring table (gameplay not specified)
 - `unityBuildId` allowlist process
-- Whether New Architecture stays on after the first `UnityView` device spike

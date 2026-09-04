@@ -2,7 +2,7 @@
 
 Real-money asynchronous 1v1 skill game. Players stake integer cents on a ~60 second 2D basketball run. The React Native shell owns auth, wallet UI, and matchmaking calls. Unity owns the run. Firebase Functions + PostgreSQL own money.
 
-This repo is in **planning / scaffolding**. There is no gameplay or UI implementation yet.
+This repo is in **Phase 4 (identity + wallet)**. Auth is email/password; debug wallet uses `ensureProfile` / `getWallet` / `mockDeposit`.
 
 ## Stack (pinned, no `^` / `~`)
 
@@ -14,7 +14,7 @@ This repo is in **planning / scaffolding**. There is no gameplay or UI implement
 | TypeScript (mobile + `packages/shared` only) | 5.9.3 |
 | Firebase Functions | JavaScript (CommonJS) |
 | `@azesmway/react-native-unity` | 1.1.1 |
-| Unity Editor | 6000.1.13f1 |
+| Unity Editor | 6000.3.18f1 |
 | RNFirebase app / auth / functions / app-check | 26.3.3 |
 | firebase-admin / firebase-functions | 14.3.0 / 7.3.2 |
 | firebase-tools | 15.29.0 |
@@ -33,7 +33,7 @@ project-x/
     src/bridge/           UnityView + message types only
     src/services/         Firebase + read-only Supabase clients (later)
     unity/builds/{ios,android}   azesmway export target
-  unity/                  Unity 6.1 source (6000.1.13f1)
+  unity/                  Unity 6 source (6000.3.18f1)
     Assets/Scripts/{Bridge,Gameplay,AntiCheat}
   backend/
     functions/            Firebase Functions (Node 22, JavaScript)
@@ -68,7 +68,8 @@ Staff skills: [`docs/skills.md`](docs/skills.md).
 ## Toolchain
 
 - Intended Node **22.18.0** (`.nvmrc`); Cloud Functions runtime is `nodejs22`. `save-exact=true` in `.npmrc`. Local Node 24 is allowed for `npm install`.
-- Unity Hub → install editor **6000.1.13f1**, open `/unity`.
-- Export iOS `UnityFramework` and Android `unityLibrary` into `mobile/unity/builds/` (not committed; regenerated from `/unity`).
+- Unity Hub → install editor **6000.3.18f1**, open `/unity`.
+- Export iOS `UnityFramework` and Android `unityLibrary` into `mobile/unity/builds/` (not committed; regenerated from `/unity`). Steps: [`docs/mobile/PHASE3_EMBED.md`](docs/mobile/PHASE3_EMBED.md).
+- New Architecture is **on** (`DECISIONS.md` A18b). RN 0.86 cannot disable it.
 
-Do not bump React Native, React, Unity, or `@azesmway/react-native-unity` independently. The first integration spike after scaffolding is a physical-device `UnityView` mount on iOS and Android.
+Do not bump React Native, React, Unity, or `@azesmway/react-native-unity` independently. The Phase 3 gate is a physical-device `UnityView` ping/pong on iOS and Android.

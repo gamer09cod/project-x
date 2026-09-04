@@ -14,7 +14,10 @@
       ],
       "predeploy": [
         "node --check backend/functions/src/index.js",
-        "node --check backend/functions/src/db.js"
+        "node --check backend/functions/src/db.js",
+        "node --check backend/functions/src/auth.js",
+        "node --check backend/functions/src/profile.js",
+        "node --check backend/functions/src/wallet.js"
       ]
     }
   ]

@@ -12,7 +12,7 @@ Approved 3 September 2026. All npm versions are exact — no `^` or `~`.
 | Mobile | typescript | 5.9.3 |
 | Backend | Language | JavaScript (CommonJS) |
 | Bridge | @azesmway/react-native-unity | 1.1.1 |
-| Game | Unity Editor | 6000.1.13f1 |
+| Game | Unity Editor | 6000.3.18f1 |
 | Auth / client | @react-native-firebase/app | 26.3.3 |
 | Auth / client | @react-native-firebase/auth | 26.3.3 |
 | Auth / client | @react-native-firebase/functions | 26.3.3 |
@@ -23,6 +23,7 @@ Approved 3 September 2026. All npm versions are exact — no `^` or `~`.
 | Data | PostgreSQL (Supabase-hosted) | 17 |
 | Data | `pg` (Functions) | 8.16.3 |
 | Language (Unity) | C# | 9.0 |
+| Mobile renderer | New Architecture | **on** (A18b; RN 0.86) |
 
 Companion `@react-native/*` packages (codegen, gradle-plugin, metro-config, typescript-config, babel-preset, eslint-config) must also be **0.86.0**. Do not mix 0.86.3 artifacts.
 

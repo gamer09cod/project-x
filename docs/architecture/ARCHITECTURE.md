@@ -9,7 +9,7 @@ Source of truth for pins: [`VERSION_MATRIX.md`](VERSION_MATRIX.md). Boundaries: 
 ```mermaid
 flowchart LR
     subgraph client ["Device"]
-        mobileApp["Mobile app RN 0.86 + Unity 6000.1.13f1"]
+        mobileApp["Mobile app RN 0.86 + Unity 6000.3.18f1"]
     end
     subgraph gateway ["Firebase edge"]
         firebaseGw["Auth, App Check, HTTPS Callables"]

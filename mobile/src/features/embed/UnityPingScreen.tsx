@@ -12,11 +12,15 @@ function newNonce(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+type Props = {
+  onBack?: () => void;
+};
+
 /**
  * Phase 3 device spike: mount UnityView at flex 1, ping, show pong.
  * Do not use this mount path for paid matches (join/start must succeed first).
  */
-export function UnityPingScreen(): React.JSX.Element {
+export function UnityPingScreen({onBack}: Props): React.JSX.Element {
   const unityRef = useRef<UnityView>(null);
   const [status, setStatus] = useState('Waiting for Unity…');
   const [lastPong, setLastPong] = useState<string | null>(null);
@@ -64,6 +68,11 @@ export function UnityPingScreen(): React.JSX.Element {
         <Pressable style={styles.button} onPress={sendPing}>
           <Text style={styles.buttonLabel}>Ping Unity</Text>
         </Pressable>
+        {onBack ? (
+          <Pressable style={[styles.button, styles.back]} onPress={onBack}>
+            <Text style={styles.buttonLabel}>Back to wallet</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -104,6 +113,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  back: {
+    backgroundColor: '#243447',
   },
   buttonLabel: {
     color: '#ffffff',

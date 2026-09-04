@@ -61,3 +61,5 @@ firebase-debug.log
 AGENTS.md
 .cursor/skills/
 .cursor/rules/
+
+.tmp-rn/

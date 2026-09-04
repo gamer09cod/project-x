@@ -64,7 +64,10 @@ describe('schema: matchmaking and rating', () => {
   });
 
   it('starts rating at 1000 and floors at 0', () => {
-    assert.match(ratingSql, /add column rating integer not null default 1000/);
+    assert.match(
+      ratingSql,
+      /add column if not exists rating integer not null default 1000/,
+    );
     assert.match(ratingSql, /users_rating_non_negative check \(rating >= 0\)/);
   });
 
