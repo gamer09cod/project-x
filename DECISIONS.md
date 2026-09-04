@@ -47,9 +47,9 @@ The client (Unity + React Native) is untrusted. The attacker is a modified APK/I
 | Direct table writes | Stolen client key | RLS deny-all; Functions use `pg` + `DATABASE_URL` | Leaked DB URL is game over |
 | Wallet without ledger | Raw `UPDATE wallets` | `apply_ledger_entry` only | — |
 
-**First defence to ship (Phase 7):** duration cap + monotone `shotLog` + reconstruct vs claimed score. It catches inflated scores that do not match the log, extra buzzer-beaters, and over-long runs. It does **not** catch a bot that plays a legal log, or a patched client that forges a coherent log.
+**First defence to ship (Phase 7 / §3.3):** duration cap + monotone `shotLog` + reconstruct vs claimed score. It catches inflated scores that do not match the log, extra buzzer-beaters, and over-long runs. It does **not** catch a bot that plays a legal log, or a patched client that forges a coherent log. Phase 5 uses stub submit (**A20**) only under `ALLOW_STUB_SUBMIT` / emulator — see **§8.5**.
 
-**Next week (order):** `unityBuildId` fail-closed → App Check on all money callables → submit rate limits → simple shot-timing heuristics.
+**Next week (order):** implement §3.3 verifier → `unityBuildId` fail-closed → App Check on all money callables → submit rate limits → simple shot-timing heuristics.
 
 ### 1.4 Out of scope for v1
 
@@ -184,6 +184,7 @@ If checks pass, write `match_players.score` from the reconstructed integer, `sta
 | A18 | New Architecture | ~~**Off** for azesmway Paper spike~~ **replaced 3 Sep 2026 by A18b** | Fabric on for first embed |
 | A18b | New Architecture | **On** (RN 0.86 / 0.82+ ignores `newArchEnabled=false`). azesmway 1.1.1 Fabric path used; `jcenter()` removed via patch. | Paper-only embed |
 | A19 | Auth provider (Phase 4) | Firebase **email/password** via RNFirebase Auth | Phone auth (deferred) |
+| A20 | Phase 5 `submitScore` | **Stub**: accept claimed `score` when `ALLOW_STUB_SUBMIT=1` or Functions emulator; persist full blob; **no** shotLog reconstruct yet | Shipping §3.3 verifier before Unity emits real logs (Phase 7) |
 
 ---
 
@@ -223,3 +224,56 @@ Callable TS: `packages/shared/src/api`. Narrative: `docs/api/CONTRACTS.md`.
 
 - Published shot scoring table (gameplay not specified)
 - `unityBuildId` allowlist process
+
+---
+
+## 8. Phase 5 lock-in (4 September 2026)
+
+Backend brief → locked choices. Implementation: `backend/functions/src/match/*`, `ledger.js`, `db.js`. Spec mirror: [`docs/backend/REQUIREMENTS.md`](docs/backend/REQUIREMENTS.md).
+
+### 8.1 Matchmaking
+
+| Brief | Decision | Phase 5 behaviour |
+|---|---|---|
+| FCFS inside same game + stake; rating must not pair | **A14** | `joinMatch` SQL: `game_id` + `stake_cents`, `ORDER BY opened_at`, **no `rating` in WHERE/ORDER** |
+| 15-minute window | **§2.3**, schema trigger | Transition to `open` sets `opened_at` / `matchmaking_expires_at = +15m` |
+| Nobody shows up — decide refund vs auto-win vs house | **A15** | **Refund stake** via `MATCH_TIMEOUT_REFUND` (`matchTimeoutRefunds` cron). Match → `timeout_refunded`. **No auto-win. No house seat.** Rating unchanged. Silent keep of money is rejected. |
+
+### 8.2 Player rating
+
+| Brief | Decision | Phase 5 behaviour |
+|---|---|---|
+| Simple ±20; draw / no opponent → 0 | **A16**, **S8** | Start 1000. Win `+20`, loss `−20` (floor 0) in the **same transaction** as settlement. Draw and `MATCH_TIMEOUT_REFUND` skip rating writes. Rating is display-only — never used in pair SQL (**A14**). |
+
+### 8.3 Data access
+
+| Brief | Decision | Phase 5 behaviour |
+|---|---|---|
+| Raw parameterised `pg` via `query` / `transaction` | **A13** | All match/money SQL uses `$1…` placeholders. No ORM, no query builder, no `@supabase/supabase-js` in Functions. Direct port **5432**. |
+
+### 8.4 Money handling
+
+| Brief | Decision | Phase 5 behaviour |
+|---|---|---|
+| Integer cents only | **S1**, **§2.2** | `bigint` / `Math.floor` before ledger; reject non-integer stakes |
+| Server sole mover of balances | **A11** | Client never writes wallets; only callables → `apply_ledger_entry` |
+| Debit at entry, not settlement | **§2.5** | `WAGER_DEBIT` inside `joinMatch` when `started_at` is set |
+| Join / submit idempotent | **S3** | Client `idempotencyKey`; replay returns original join/submit; ledger unique keys |
+| Settlement atomic | **A11** | One `transaction()`: scores, `PAYOUT_CREDIT` / `DRAW_REFUND`, rating, match status |
+| Append-only ledger | **A11**, **S2** | Every movement is a ledger row; wallets only via the RPC |
+
+### 8.5 Score trust
+
+| Brief | Decision | Phase 5 behaviour |
+|---|---|---|
+| Threat model (concrete cheats) | **§1** | Fake score, slowed clock, replay, modified build, scripted input, crash-scum, pool timeout theft — table in §1.3 |
+| At least one real server defence | **§1.3**, **§3.3** → **Phase 7** | Phase 5 does **not** claim the reconstruct defence. Interim controls shipped now: Auth on money callables, idempotency, 75s zero-score cron (**§2.5**), 15m refund (**A15**), schemaVersion gate, late submit → `ignored_deadline`. Claimed-score path is **A20** stub only. |
+| What next (another week) | **§1.3** | Order: implement §3.3 verifier (Phase 7) → `unityBuildId` fail-closed → App Check on money callables → submit rate limits → shot-timing heuristics |
+
+**Honest holes (Phase 5):** with `ALLOW_STUB_SUBMIT=1`, a patched client can claim any integer score. Unset the flag outside test/emulator. The stub exists so two accounts can prove the match loop without Unity (plan gate); it is not a paid-path defence.
+
+### 8.6 Payments
+
+| Brief | Decision | Phase 5 behaviour |
+|---|---|---|
+| Mock only — no cards / webhooks | **A17** | `mockDeposit` → `ADMIN_CREDIT` via `apply_ledger_entry`. No Stripe. |

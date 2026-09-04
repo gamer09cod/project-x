@@ -2,10 +2,17 @@
 
 const admin = require('firebase-admin');
 const { onCall, HttpsError } = require('firebase-functions/https');
+const { onSchedule } = require('firebase-functions/scheduler');
 const { setGlobalOptions } = require('firebase-functions/options');
 const { query } = require('./db');
 const { ensureProfileHandler, getWalletHandler } = require('./profile');
 const { mockDepositHandler } = require('./wallet');
+const { joinMatchHandler } = require('./match/join');
+const { submitScoreHandler } = require('./match/submit');
+const {
+  runZeroExpiredScores,
+  runMatchTimeoutRefunds,
+} = require('./match/crons');
 
 if (!admin.apps || !admin.apps.length) {
   admin.initializeApp();
@@ -22,9 +29,19 @@ const CALLABLE_OPTS = {
   enforceAppCheck: false,
 };
 
-/**
- * Phase 2 smoke callable. Proves this instance can open Postgres.
- */
+function wrap(name, handler) {
+  return onCall(CALLABLE_OPTS, async (request) => {
+    try {
+      return await handler(request);
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error(`${name} failed:`, err && err.message);
+      throw new HttpsError('internal', `${name}_failed`);
+    }
+  });
+}
+
+/** Phase 2 smoke callable. */
 exports.health = onCall(CALLABLE_OPTS, async () => {
   try {
     const { rows } = await query('SELECT 1 AS ok', []);
@@ -40,35 +57,35 @@ exports.health = onCall(CALLABLE_OPTS, async () => {
   }
 });
 
-/** Phase 4: upsert users + rely on wallet trigger. */
-exports.ensureProfile = onCall(CALLABLE_OPTS, async (request) => {
-  try {
-    return await ensureProfileHandler(request);
-  } catch (err) {
-    if (err instanceof HttpsError) throw err;
-    console.error('ensureProfile failed:', err && err.message);
-    throw new HttpsError('internal', 'ensure_profile_failed');
-  }
-});
+exports.ensureProfile = wrap('ensureProfile', ensureProfileHandler);
+exports.getWallet = wrap('getWallet', getWalletHandler);
+exports.mockDeposit = wrap('mockDeposit', mockDepositHandler);
 
-/** Phase 4: read balance_cents + rating. */
-exports.getWallet = onCall(CALLABLE_OPTS, async (request) => {
-  try {
-    return await getWalletHandler(request);
-  } catch (err) {
-    if (err instanceof HttpsError) throw err;
-    console.error('getWallet failed:', err && err.message);
-    throw new HttpsError('internal', 'get_wallet_failed');
-  }
-});
+/** Phase 5: FCFS join + WAGER_DEBIT at start. */
+exports.joinMatch = wrap('joinMatch', joinMatchHandler);
 
-/** Phase 4: tester ADMIN_CREDIT via apply_ledger_entry. */
-exports.mockDeposit = onCall(CALLABLE_OPTS, async (request) => {
-  try {
-    return await mockDepositHandler(request);
-  } catch (err) {
-    if (err instanceof HttpsError) throw err;
-    console.error('mockDeposit failed:', err && err.message);
-    throw new HttpsError('internal', 'mock_deposit_failed');
-  }
-});
+/**
+ * Phase 5 stub submitScore (no shot reconstruction).
+ * Requires ALLOW_STUB_SUBMIT=1 or Functions emulator. Phase 7 replaces verifier.
+ */
+exports.submitScore = wrap('submitScore', submitScoreHandler);
+
+/** Every minute: zero running players past score_deadline_at. */
+exports.zeroExpiredScores = onSchedule(
+  { schedule: 'every 1 minutes', timeZone: 'Etc/UTC' },
+  async () => {
+    const result = await runZeroExpiredScores();
+    console.log('zeroExpiredScores', result);
+    return result;
+  },
+);
+
+/** Every minute: MATCH_TIMEOUT_REFUND for expired open matches. */
+exports.matchTimeoutRefunds = onSchedule(
+  { schedule: 'every 1 minutes', timeZone: 'Etc/UTC' },
+  async () => {
+    const result = await runMatchTimeoutRefunds();
+    console.log('matchTimeoutRefunds', result);
+    return result;
+  },
+);

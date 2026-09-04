@@ -2,7 +2,7 @@
 
 Real-money asynchronous 1v1 skill game. Players stake integer cents on a ~60 second 2D basketball run. The React Native shell owns auth, wallet UI, and matchmaking calls. Unity owns the run. Firebase Functions + PostgreSQL own money.
 
-This repo is in **Phase 4 (identity + wallet)**. Auth is email/password; debug wallet uses `ensureProfile` / `getWallet` / `mockDeposit`.
+This repo is in **Phase 5 (server match loop)**. Stub `submitScore` requires `ALLOW_STUB_SUBMIT=1`. Real score defence is Phase 7.
 
 ## Stack (pinned, no `^` / `~`)
 

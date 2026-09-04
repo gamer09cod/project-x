@@ -30,19 +30,32 @@ export {
 export type { ScorePayload, ScorePayloadV1, ShotLogEntry, ShotResult } from "./score-payload";
 
 export {
+  ENSURE_PROFILE,
+  GET_WALLET,
   JOIN_MATCH,
+  MOCK_DEPOSIT,
+  MOCK_DEPOSIT_MAX_CENTS,
   START_STREAK,
   SUBMIT_SCORE,
+  ensureProfileAuth,
+  getWalletAuth,
   joinMatchAuth,
+  mockDepositAuth,
   startStreakAuth,
   submitScoreAuth,
 } from "./api";
 export type {
   CallableErrorCode,
   CallableErrorDetails,
+  EnsureProfileRequest,
+  EnsureProfileResponse,
+  GetWalletRequest,
+  GetWalletResponse,
   JoinMatchRequest,
   JoinMatchResponse,
   MatchSettleResult,
+  MockDepositRequest,
+  MockDepositResponse,
   MutationAuth,
   StartStreakRequest,
   StartStreakResponse,

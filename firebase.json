@@ -17,7 +17,13 @@
         "node --check backend/functions/src/db.js",
         "node --check backend/functions/src/auth.js",
         "node --check backend/functions/src/profile.js",
-        "node --check backend/functions/src/wallet.js"
+        "node --check backend/functions/src/wallet.js",
+        "node --check backend/functions/src/ledger.js",
+        "node --check backend/functions/src/users.js",
+        "node --check backend/functions/src/match/join.js",
+        "node --check backend/functions/src/match/submit.js",
+        "node --check backend/functions/src/match/settle.js",
+        "node --check backend/functions/src/match/crons.js"
       ]
     }
   ]
