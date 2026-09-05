@@ -5,6 +5,6 @@ namespace ProjectX.Bridge
     /// </summary>
     public static class UnityBuildId
     {
-        public const string Value = "basketball_v1-phase3-embed";
+        public const string Value = "basketball_v1-phase6";
     }
 }
