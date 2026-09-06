@@ -36,6 +36,15 @@ public class ShotClock : MonoBehaviour
         game.ui?.UpdateClock();
     }
 
+    /// <summary>Embed startRun: assign remaining, do not keep leftover time.</summary>
+    public void StartClockExact(float seconds)
+    {
+        remaining = Mathf.Max(0f, seconds);
+        frozen = false;
+        started = true;
+        game.ui?.UpdateClock();
+    }
+
     public void AddTime(float seconds)
     {
         remaining += seconds;

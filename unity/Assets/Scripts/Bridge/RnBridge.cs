@@ -92,17 +92,11 @@ namespace ProjectX.Bridge
         }
 
         /// <summary>
-        /// Clears a stale embed run. BridgeHost is DontDestroyOnLoad — without this,
-        /// Leave → remount leaves _runActive true and the next startRun is ignored.
+        /// Clears leftover embed state. Unity stays mounted — next startRun must
+        /// reset the playfield even after scorePayload (_runActive already false).
         /// </summary>
         void AbortActiveRun()
         {
-            if (!_runActive && _active == null)
-            {
-                _status = "idle";
-                return;
-            }
-
             _runActive = false;
             _active = null;
 
@@ -136,16 +130,14 @@ namespace ProjectX.Bridge
         void HandleStartRun(string message)
         {
             var incomingId = ExtractJsonString(message, "clientRunId");
-            if (_runActive)
+            // Same clientRunId while active — duplicate postMessage; ignore.
+            if (_runActive && _active != null && incomingId == _active.ClientRunId)
             {
-                // Same clientRunId — duplicate postMessage while Unity boots; ignore.
-                if (_active != null && incomingId == _active.ClientRunId)
-                {
-                    return;
-                }
-                // New clientRunId after RN remount / Leave without abort — reclaim the seat.
-                AbortActiveRun();
+                return;
             }
+
+            // New id, or start after scorePayload (_runActive false) — reset first.
+            AbortActiveRun();
 
             var config = ParseStartRun(message);
             if (config == null || string.IsNullOrEmpty(config.ClientRunId))
@@ -188,6 +180,7 @@ namespace ProjectX.Bridge
         {
             NativeApi.SendToMobileApp(scorePayloadEnvelope);
             _runActive = false;
+            _active = null;
             _status = "scorePayload sent";
         }
 

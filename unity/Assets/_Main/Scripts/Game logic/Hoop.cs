@@ -46,6 +46,22 @@ public class Hoop : MonoBehaviour
         rim.transform.position = p;
     }
 
+    public void ResetToIdle()
+    {
+        if (rim != null)
+            LeanTween.cancel(rim.gameObject);
+        moving = false;
+        transform.position = defaultPosition;
+        if (rb != null)
+            rb.linearVelocity = Vector2.zero;
+        if (rim != null)
+        {
+            Vector3 p = rim.transform.position;
+            p.y = rimPos.y;
+            rim.transform.position = p;
+        }
+    }
+
     public void UpdateHoop()
     {
         if (moving && Game.Instance.stage < 2)

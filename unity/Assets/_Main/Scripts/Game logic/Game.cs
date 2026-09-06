@@ -105,23 +105,17 @@ public class Game : MonoBehaviour
     }
 
     /// <summary>
-    /// project-x RN handshake. Starts the 60s clock immediately; ends with scorePayload.
+    /// Snap playfield to a fresh embed idle. Synchronous — do not use arcade ResetGame.
     /// </summary>
-    public void BeginEmbedMatch(
-        float durationSeconds,
-        string clientRunId,
-        string unityBuildId,
-        Action<string> onScorePayloadEnvelope)
+    public void ResetPlayfieldForEmbed()
     {
-        embedMatchMode = true;
-        _embedClientRunId = clientRunId ?? "";
-        _embedUnityBuildId = unityBuildId ?? "";
-        _embedOnFinished = onScorePayloadEnvelope;
-        hasUsedBuzzerBeater = false;
-        buzzerBeaterTriggered = false;
+        _embedOnFinished = null;
+        _embedClientRunId = "";
+        _embedUnityBuildId = "";
         _embedElapsed = 0f;
         _embedLog.Clear();
-
+        hasUsedBuzzerBeater = false;
+        buzzerBeaterTriggered = false;
         continued = false;
         stage = 0;
         if (Progress.Instance != null)
@@ -130,25 +124,50 @@ public class Game : MonoBehaviour
             Progress.Instance.score = 0;
         }
 
+        if (ball != null)
+        {
+            LeanTween.cancel(ball.gameObject);
+            ball.StopAllCoroutines();
+            ball.UpdateBall();
+        }
+
+        hoop?.ResetToIdle();
+        shotClock?.ResetFrozen();
+        shotClock?.SetInFlight(false);
         Resume();
-        UpdateGame();
-        float seconds = durationSeconds > 0f ? durationSeconds : (config != null ? config.gameTime : 60f);
-        shotClock.StartClock(seconds);
         ui?.UpdateScores(true);
         ui?.UpdateClock();
     }
 
     /// <summary>
-    /// RN left / remounted before scorePayload. Do not emit a payload — server owns zero.
+    /// project-x RN handshake. Starts the 60s clock immediately; ends with scorePayload.
+    /// </summary>
+    public void BeginEmbedMatch(
+        float durationSeconds,
+        string clientRunId,
+        string unityBuildId,
+        Action<string> onScorePayloadEnvelope)
+    {
+        ResetPlayfieldForEmbed();
+        embedMatchMode = true;
+        _embedClientRunId = clientRunId ?? "";
+        _embedUnityBuildId = unityBuildId ?? "";
+        _embedOnFinished = onScorePayloadEnvelope;
+
+        float seconds = durationSeconds > 0f ? durationSeconds : (config != null ? config.gameTime : 60f);
+        shotClock.StartClockExact(seconds);
+        ui?.UpdateScores(true);
+        ui?.UpdateClock();
+    }
+
+    /// <summary>
+    /// RN left / remounted before scorePayload, or next startRun after a finished payload.
+    /// Do not emit a payload — server owns zero on abort.
     /// </summary>
     public void CancelEmbedMatch()
     {
-        if (!embedMatchMode)
-            return;
-        _embedOnFinished = null;
+        ResetPlayfieldForEmbed();
         embedMatchMode = false;
-        _embedLog.Clear();
-        shotClock?.ResetFrozen();
         Pause();
     }
 
@@ -330,7 +349,7 @@ public class Game : MonoBehaviour
         var cb = _embedOnFinished;
         _embedOnFinished = null;
         embedMatchMode = false;
-        // Stop input / clock; RN will unmount UnityView on scorePayload.
+        // Stop input / clock; RN keeps Unity mounted (paused) behind result/tabs.
         Pause();
         cb(payload);
     }
