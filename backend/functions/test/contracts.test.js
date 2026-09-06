@@ -78,7 +78,16 @@ describe('callable names and auth', () => {
 
     assert.match(join, /export const JOIN_MATCH = "joinMatch"/);
     assert.match(streak, /export const START_STREAK = "startStreak"/);
+    assert.match(streak, /export const CONTINUE_STREAK = "continueStreak"/);
+    assert.match(streak, /export const ABANDON_STREAK = "abandonStreak"/);
+    assert.match(streak, /export const GET_ACTIVE_STREAK = "getActiveStreak"/);
+    assert.match(streak, /STREAK_LEGS_TOTAL = 3/);
     assert.match(submit, /export const SUBMIT_SCORE = "submitScore"/);
+    assert.match(submit, /streak_leg_cleared/);
+
+    const list = read('packages/shared/src/api/list-boosts.ts');
+    assert.match(list, /export const LIST_BOOSTS = "listBoosts"/);
+    assert.match(list, /idTokenRequired: true/);
 
     for (const src of [join, streak, submit]) {
       assert.match(src, /idTokenRequired: true/);

@@ -8,6 +8,14 @@ const { query } = require('./db');
 const { ensureProfileHandler, getWalletHandler } = require('./profile');
 const { mockDepositHandler } = require('./wallet');
 const { joinMatchHandler } = require('./match/join');
+const { listBoostsHandler } = require('./match/boosts');
+const {
+  startStreakHandler,
+  continueStreakHandler,
+  abandonStreakHandler,
+  getActiveStreakHandler,
+  runExpireStreaks,
+} = require('./match/streak');
 const { submitScoreHandler } = require('./match/submit');
 const {
   runZeroExpiredScores,
@@ -64,9 +72,18 @@ exports.mockDeposit = wrap('mockDeposit', mockDepositHandler);
 /** Phase 5: FCFS join + WAGER_DEBIT at start. */
 exports.joinMatch = wrap('joinMatch', joinMatchHandler);
 
+/** Prize-boost inventory for the authenticated player. */
+exports.listBoosts = wrap('listBoosts', listBoostsHandler);
+
+/** Phase 8+: 3-leg streak + STREAK_WAGER_DEBIT once. */
+exports.startStreak = wrap('startStreak', startStreakHandler);
+exports.continueStreak = wrap('continueStreak', continueStreakHandler);
+exports.abandonStreak = wrap('abandonStreak', abandonStreakHandler);
+exports.getActiveStreak = wrap('getActiveStreak', getActiveStreakHandler);
+
 /**
- * Phase 5 stub submitScore (no shot reconstruction).
- * Requires ALLOW_STUB_SUBMIT=1 or Functions emulator. Phase 7 replaces verifier.
+ * Phase 7+ submitScore: schema reject vs §3.3 checks (fail → score 0); then settle
+ * (1v1 or streak seed / leg progress).
  */
 exports.submitScore = wrap('submitScore', submitScoreHandler);
 
@@ -86,6 +103,16 @@ exports.matchTimeoutRefunds = onSchedule(
   async () => {
     const result = await runMatchTimeoutRefunds();
     console.log('matchTimeoutRefunds', result);
+    return result;
+  },
+);
+
+/** Every minute: active streaks past expires_at → lost, no refund (§11.2). */
+exports.expireStreaks = onSchedule(
+  { schedule: 'every 1 minutes', timeZone: 'Etc/UTC' },
+  async () => {
+    const result = await runExpireStreaks();
+    console.log('expireStreaks', result);
     return result;
   },
 );

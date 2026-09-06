@@ -9,7 +9,8 @@ const {
   MATCH_STATUS,
 } = require('../domain');
 const { applyLedger, getBalance } = require('../ledger');
-const { loadActiveUser, hasActiveMatch } = require('../users');
+const { loadActiveUser, hasActiveMatch, hasActiveStreak } = require('../users');
+const { consumeBoostForJoin } = require('./boosts');
 
 const GAME_ID = 'basketball_v1';
 
@@ -26,6 +27,8 @@ async function rebuildJoinResponse(client, joinKey) {
        mp.seat,
        mp.stake_cents,
        mp.boost_id,
+       mp.boost_bonus_bps,
+       mp.boost_max_wager_cents,
        mp.started_at,
        mp.score_deadline_at,
        m.status AS match_status,
@@ -69,6 +72,13 @@ async function rebuildJoinResponse(client, joinKey) {
     startedAt: new Date(row.started_at).toISOString(),
     scoreDeadlineAt: new Date(row.score_deadline_at).toISOString(),
     boostId: row.boost_id,
+    boost: row.boost_id
+      ? {
+          id: row.boost_id,
+          percentageBps: Number(row.boost_bonus_bps || 0),
+          maxWagerCents: Number(row.boost_max_wager_cents || 0),
+        }
+      : null,
     opponentPostedScore,
     walletBalanceCents: balance,
   };
@@ -98,12 +108,8 @@ async function joinMatchHandler(request) {
   if (!isUuid(idempotencyKey)) {
     fail('invalid_argument', 'idempotencyKey must be a UUID', 'invalid-argument');
   }
-  if (boostId != null) {
-    if (!isUuid(boostId)) {
-      fail('invalid_argument', 'boostId must be a UUID or null', 'invalid-argument');
-    }
-    // Prize boosts land in Phase 8.
-    fail('boost_unavailable', 'Boosts are not enabled yet', 'failed-precondition');
+  if (boostId != null && !isUuid(boostId)) {
+    fail('invalid_argument', 'boostId must be a UUID or null', 'invalid-argument');
   }
 
   return transaction(async (client) => {
@@ -115,6 +121,9 @@ async function joinMatchHandler(request) {
     const user = await loadActiveUser(client, uid);
     if (await hasActiveMatch(client, user.id)) {
       fail('already_active_match', 'Finish your current match first', 'failed-precondition');
+    }
+    if (await hasActiveStreak(client, user.id)) {
+      fail('already_active_streak', 'Finish your current streak first', 'failed-precondition');
     }
 
     // FCFS: oldest open 1v1 at this stake. Never filter/order by rating.
@@ -177,6 +186,19 @@ async function joinMatchHandler(request) {
       matchStatus = MATCH_STATUS.LIVE;
     }
 
+    let consumed = null;
+    if (boostId != null) {
+      logBoostSelected(user.id, boostId, matchId);
+      consumed = await consumeBoostForJoin(client, {
+        boostId,
+        userId: user.id,
+        matchId,
+        gameId,
+        gameMode: MATCH_MODE.PVP_1V1,
+        stakeCents,
+      });
+    }
+
     const ledger = await applyLedger(client, {
       userId: user.id,
       entryType: LEDGER_ENTRY_TYPE.WAGER_DEBIT,
@@ -184,16 +206,21 @@ async function joinMatchHandler(request) {
       idempotencyKey,
       clientIdempotencyKey: idempotencyKey,
       matchId,
+      boostId: consumed ? consumed.boostId : null,
     });
 
     const startedAt = new Date();
     const player = await client.query(
       `INSERT INTO match_players (
          match_id, user_id, seat, status, stake_cents,
+         boost_id, boost_bonus_bps, boost_max_wager_cents,
+         boost_promo_budget_id, boost_promo_reserved_cents, boost_promo_exposure_cents,
          started_at, join_idempotency_key
        ) VALUES (
          $1, $2, $3, $4, $5,
-         $6, $7
+         $6, $7, $8,
+         $9, $10, $11,
+         $12, $13
        )
        RETURNING id, started_at, score_deadline_at`,
       [
@@ -202,6 +229,12 @@ async function joinMatchHandler(request) {
         seat,
         MATCH_PLAYER_STATUS.RUNNING,
         stakeCents,
+        consumed ? consumed.boostId : null,
+        consumed ? consumed.bonusBps : null,
+        consumed ? consumed.maxWagerCents : null,
+        consumed ? consumed.promoBudgetId : null,
+        consumed ? consumed.promoReservedCents : 0,
+        consumed ? consumed.promoExposureCents : 0,
         startedAt.toISOString(),
         idempotencyKey,
       ],
@@ -216,11 +249,29 @@ async function joinMatchHandler(request) {
       stakeCents,
       startedAt: new Date(player.rows[0].started_at).toISOString(),
       scoreDeadlineAt: new Date(player.rows[0].score_deadline_at).toISOString(),
-      boostId: null,
+      boostId: consumed ? consumed.boostId : null,
+      boost: consumed
+        ? {
+            id: consumed.boostId,
+            percentageBps: consumed.bonusBps,
+            maxWagerCents: consumed.maxWagerCents,
+          }
+        : null,
       opponentPostedScore,
       walletBalanceCents: Number(ledger.balance_after_cents),
     };
   });
+}
+
+function logBoostSelected(playerId, boostId, matchId) {
+  console.log(
+    JSON.stringify({
+      event: 'boost_selected',
+      playerId,
+      boostId,
+      matchId,
+    }),
+  );
 }
 
 module.exports = { joinMatchHandler, rebuildJoinResponse, GAME_ID };

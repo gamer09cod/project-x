@@ -29,19 +29,38 @@ export {
 } from "./score-payload";
 export type { ScorePayload, ScorePayloadV1, ShotLogEntry, ShotResult } from "./score-payload";
 
+export { BRIDGE_MESSAGE_VERSION } from "./bridge";
+export type {
+  BridgeMessageVersion,
+  RnToUnityMessage,
+  RunReadyMessage,
+  ScorePayloadBridgeMessage,
+  StartRunMessage,
+  UnityToRnMessage,
+} from "./bridge";
 export {
   ENSURE_PROFILE,
   GET_WALLET,
   JOIN_MATCH,
+  LIST_BOOSTS,
   MOCK_DEPOSIT,
   MOCK_DEPOSIT_MAX_CENTS,
   START_STREAK,
+  CONTINUE_STREAK,
+  ABANDON_STREAK,
+  GET_ACTIVE_STREAK,
+  STREAK_LEGS_TOTAL,
+  STREAK_FALLBACK_TARGETS,
   SUBMIT_SCORE,
   ensureProfileAuth,
   getWalletAuth,
   joinMatchAuth,
+  listBoostsAuth,
   mockDepositAuth,
   startStreakAuth,
+  continueStreakAuth,
+  abandonStreakAuth,
+  getActiveStreakAuth,
   submitScoreAuth,
 } from "./api";
 export type {
@@ -53,12 +72,23 @@ export type {
   GetWalletResponse,
   JoinMatchRequest,
   JoinMatchResponse,
+  ListBoostsRequest,
+  ListBoostsResponse,
+  PlayerBoost,
   MatchSettleResult,
   MockDepositRequest,
   MockDepositResponse,
   MutationAuth,
   StartStreakRequest,
   StartStreakResponse,
+  ContinueStreakRequest,
+  ContinueStreakResponse,
+  AbandonStreakRequest,
+  AbandonStreakResponse,
+  StreakRunResponse,
+  GetActiveStreakRequest,
+  GetActiveStreakResponse,
+  StreakSnapshot,
   SubmitScoreRequest,
   SubmitScoreResponse,
 } from "./api";

@@ -11,6 +11,10 @@ const ENV_FILE = path.join(ROOT, 'backend/functions/.env');
 const FILES = [
   '20260903120000_init.sql',
   '20260903140000_player_rating.sql',
+  '20260904120000_client_run_id.sql',
+  '20260904180000_streak_three_legs.sql',
+  '20260905120000_prize_boost_promo.sql',
+  '20260906120000_streak_resume.sql',
 ];
 
 function loadDotEnv(filePath) {

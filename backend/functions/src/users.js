@@ -5,6 +5,7 @@ const {
   MATCH_MODE,
   MATCH_PLAYER_STATUS,
   MATCH_STATUS,
+  STREAK_STATUS,
   USER_STATUS,
 } = require('./domain');
 
@@ -31,7 +32,9 @@ async function loadActiveUser(client, firebaseUid) {
 }
 
 /**
- * True if the user is still in an unfinished 1v1 / live run.
+ * True if the user has an in-progress run (timer ticking).
+ * Open pool seats that are already scored (waiting for a challenger) do NOT count —
+ * streak seeds must not block continueStreak / further play (§2.1).
  * @param {import('pg').PoolClient} client
  * @param {string} userId
  */
@@ -41,27 +44,45 @@ async function hasActiveMatch(client, userId) {
      FROM match_players mp
      JOIN matches m ON m.id = mp.match_id
      WHERE mp.user_id = $1
-       AND m.mode = $2
        AND (
-         mp.status IN ($3, $4)
-         OR m.status IN ($5, $6, $7)
+         mp.status IN ($2, $3)
+         OR (
+           m.mode = $4
+           AND m.status = $5
+           AND mp.status IN ($2, $3)
+         )
+         OR (
+           m.mode = $6
+           AND m.status IN ($5, $7)
+           AND mp.status IN ($2, $3)
+         )
        )
-       AND m.status NOT IN ($8, $9, $10)
      LIMIT 1`,
     [
       userId,
-      MATCH_MODE.PVP_1V1,
       MATCH_PLAYER_STATUS.PENDING,
       MATCH_PLAYER_STATUS.RUNNING,
+      MATCH_MODE.STREAK,
       MATCH_STATUS.LIVE,
-      MATCH_STATUS.OPEN,
+      MATCH_MODE.PVP_1V1,
       MATCH_STATUS.PAIRED,
-      MATCH_STATUS.SETTLED,
-      MATCH_STATUS.TIMEOUT_REFUNDED,
-      MATCH_STATUS.VOID,
     ],
   );
   return Boolean(rows[0]);
 }
 
-module.exports = { loadActiveUser, hasActiveMatch };
+/**
+ * @param {import('pg').PoolClient} client
+ * @param {string} userId
+ */
+async function hasActiveStreak(client, userId) {
+  const { rows } = await client.query(
+    `SELECT id FROM streaks
+     WHERE user_id = $1 AND status = $2
+     LIMIT 1`,
+    [userId, STREAK_STATUS.ACTIVE],
+  );
+  return Boolean(rows[0]);
+}
+
+module.exports = { loadActiveUser, hasActiveMatch, hasActiveStreak };

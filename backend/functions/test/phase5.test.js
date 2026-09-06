@@ -2,10 +2,8 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { HttpsError } = require('firebase-functions/https');
 
 const { uuidFromSeed } = require('../src/ledger');
-const { parseStubPayload } = require('../src/match/submit');
 const { RATING_WIN_DELTA, RATING_LOSS_DELTA } = require('../src/match/settle');
 const { GAME_ID } = require('../src/match/join');
 
@@ -19,37 +17,6 @@ describe('uuidFromSeed', () => {
     assert.match(
       a,
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-    );
-  });
-});
-
-describe('parseStubPayload', () => {
-  it('accepts schemaVersion 1 with non-negative integer score', () => {
-    const parsed = parseStubPayload({
-      schemaVersion: 1,
-      score: 12,
-      durationMs: 60000,
-    });
-    assert.equal(parsed.score, 12);
-  });
-
-  it('rejects unknown schemaVersion', () => {
-    assert.throws(
-      () => parseStubPayload({ schemaVersion: 99, score: 1 }),
-      (err) =>
-        err instanceof HttpsError &&
-        err.details &&
-        err.details.code === 'unknown_schema_version',
-    );
-  });
-
-  it('rejects non-integer score', () => {
-    assert.throws(
-      () => parseStubPayload({ schemaVersion: 1, score: 1.5 }),
-      (err) =>
-        err instanceof HttpsError &&
-        err.details &&
-        err.details.code === 'invalid_argument',
     );
   });
 });

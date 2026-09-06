@@ -8,6 +8,7 @@ const {
   MATCH_STATUS,
 } = require('../domain');
 const { applyLedger, uuidFromSeed } = require('../ledger');
+const { closeBoostReservation } = require('./boosts');
 const { zeroPlayerScore } = require('./submit');
 
 /**
@@ -65,7 +66,8 @@ async function runMatchTimeoutRefunds() {
       if (!match) return false;
 
       const players = await client.query(
-        `SELECT id, user_id, stake_cents
+        `SELECT id, user_id, stake_cents, boost_id,
+                boost_promo_budget_id, boost_promo_reserved_cents
          FROM match_players
          WHERE match_id = $1
          FOR UPDATE`,
@@ -73,19 +75,41 @@ async function runMatchTimeoutRefunds() {
       );
 
       for (const p of players.rows) {
-        const stake = Number(p.stake_cents);
-        await applyLedger(client, {
-          userId: p.user_id,
-          entryType: LEDGER_ENTRY_TYPE.MATCH_TIMEOUT_REFUND,
-          deltaCents: stake,
-          idempotencyKey: uuidFromSeed(
-            `${LEDGER_ENTRY_TYPE.MATCH_TIMEOUT_REFUND}:${match.id}:${p.user_id}`,
-          ),
-          clientIdempotencyKey: uuidFromSeed(
-            `${LEDGER_ENTRY_TYPE.MATCH_TIMEOUT_REFUND}:client:${match.id}:${p.user_id}`,
-          ),
-          matchId: match.id,
-        });
+        // Streak-seeded seat 1 has no WAGER_DEBIT on the open row — do not refund.
+        const debit = await client.query(
+          `SELECT id FROM ledger
+           WHERE match_id = $1
+             AND wallet_user_id = $2
+             AND entry_type = $3
+           LIMIT 1`,
+          [match.id, p.user_id, LEDGER_ENTRY_TYPE.WAGER_DEBIT],
+        );
+        if (debit.rows[0]) {
+          const stake = Number(p.stake_cents);
+          await applyLedger(client, {
+            userId: p.user_id,
+            entryType: LEDGER_ENTRY_TYPE.MATCH_TIMEOUT_REFUND,
+            deltaCents: stake,
+            idempotencyKey: uuidFromSeed(
+              `${LEDGER_ENTRY_TYPE.MATCH_TIMEOUT_REFUND}:${match.id}:${p.user_id}`,
+            ),
+            clientIdempotencyKey: uuidFromSeed(
+              `${LEDGER_ENTRY_TYPE.MATCH_TIMEOUT_REFUND}:client:${match.id}:${p.user_id}`,
+            ),
+            matchId: match.id,
+          });
+        }
+        if (p.boost_id) {
+          await closeBoostReservation(client, {
+            userId: p.user_id,
+            boostId: p.boost_id,
+            promoBudgetId: p.boost_promo_budget_id,
+            reservedCents: Number(p.boost_promo_reserved_cents || 0),
+            restoreInventory: true,
+            matchId: match.id,
+            matchPlayerId: p.id,
+          });
+        }
         await client.query(
           `UPDATE match_players
            SET status = $2, updated_at = now()
