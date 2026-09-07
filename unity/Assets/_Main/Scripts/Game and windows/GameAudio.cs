@@ -25,7 +25,8 @@ public class GameAudio : MonoBehaviour
     AudioSource source;
     AudioSource musicSource;
     float lastHitTime;
-    bool _allowMusic;
+    /// <summary>True while an embed run is active (BeginEmbed → Pause/end).</summary>
+    bool _gameplayActive;
 
     public static GameAudio Instance
     {
@@ -45,7 +46,6 @@ public class GameAudio : MonoBehaviour
             source = gameObject.AddComponent<AudioSource>();
         source.playOnAwake = false;
         source.spatialBlend = 0f;
-        // Must respect AudioListener.pause — RN pauseUnity / app background.
         source.ignoreListenerPause = false;
         source.loop = false;
 
@@ -58,8 +58,6 @@ public class GameAudio : MonoBehaviour
 
     void Start()
     {
-        // Do not auto-play: embed host stays mounted behind results/tabs.
-        // BeginEmbedMatch / SetGameplayActive(true) starts music.
         StopAll();
     }
 
@@ -68,7 +66,7 @@ public class GameAudio : MonoBehaviour
     /// </summary>
     public void SetGameplayActive(bool active)
     {
-        _allowMusic = active;
+        _gameplayActive = active;
         if (active)
             PlayBgMusic();
         else
@@ -77,7 +75,7 @@ public class GameAudio : MonoBehaviour
 
     public void StopAll()
     {
-        _allowMusic = false;
+        _gameplayActive = false;
         if (musicSource != null)
         {
             musicSource.Stop();
@@ -87,10 +85,37 @@ public class GameAudio : MonoBehaviour
             source.Stop();
     }
 
+    /// <summary>App minimize — mute without ending the run session.</summary>
+    void MuteTransient()
+    {
+        if (musicSource != null && musicSource.isPlaying)
+            musicSource.Pause();
+        if (source != null)
+            source.Stop();
+    }
+
+    void RestoreIfGameplay()
+    {
+        if (!_gameplayActive)
+            return;
+        var game = Game.Instance;
+        if (game == null || !game.embedMatchMode || game.paused)
+            return;
+        PlayBgMusic();
+        // RN unpauses Unity shortly after AppState=active; re-assert BGM once.
+        CancelInvoke(nameof(PlayBgMusic));
+        Invoke(nameof(PlayBgMusic), 0.2f);
+    }
+
     public void PlayBgMusic()
     {
-        if (!_allowMusic || !bgMusic || !musicSource)
+        if (!_gameplayActive || !bgMusic || !musicSource)
             return;
+        if (musicSource.clip == bgMusic && musicSource.time > 0f && !musicSource.isPlaying)
+        {
+            musicSource.UnPause();
+            return;
+        }
         if (musicSource.isPlaying && musicSource.clip == bgMusic)
             return;
         musicSource.clip = bgMusic;
@@ -138,28 +163,22 @@ public class GameAudio : MonoBehaviour
     void OnApplicationPause(bool pauseStatus)
     {
         if (pauseStatus)
-            StopAll();
+            MuteTransient();
+        else
+            RestoreIfGameplay();
     }
 
     void OnApplicationFocus(bool hasFocus)
     {
         if (!hasFocus)
-        {
-            StopAll();
-            return;
-        }
-
-        // Android may resume the player on maximize; only restore music in an active run.
-        var game = Game.Instance;
-        if (game != null && game.embedMatchMode && !game.paused && _allowMusic)
-            PlayBgMusic();
+            MuteTransient();
         else
-            StopAll();
+            RestoreIfGameplay();
     }
 
     void PlayRandom(AudioClip[] clips, float volume, float minGap = 0f, float pitch = 1f)
     {
-        if (!_allowMusic)
+        if (!_gameplayActive)
             return;
         if (clips == null || clips.Length == 0)
             return;
@@ -172,7 +191,7 @@ public class GameAudio : MonoBehaviour
 
     void Play(AudioClip clip, float volume, float pitch = 1f)
     {
-        if (!_allowMusic || !clip || !source)
+        if (!_gameplayActive || !clip || !source)
             return;
         source.pitch = pitch;
         source.PlayOneShot(clip, volume);
