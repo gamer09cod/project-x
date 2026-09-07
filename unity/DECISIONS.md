@@ -8,10 +8,11 @@ Timed **skill run** for stakes-fair play: one possession you feed with good shot
 
 ## Loop
 
-- Shot clock is **frozen** until the first make.
-- After that it **ticks down once** for `gameTime`. Makes do **not** add time (score only). Pause and buzzer slow-mo do not tick.
+- Shot clock starts on **scene launch** with `gameTime` (and again after arcade game-over reset).
+- It **ticks down once** for `gameTime`. Makes do **not** add time (score only). Pause and buzzer slow-mo do not tick.
 - A miss does **not** end the run. The ball rolls in from the side opposite the hoop; the clock keeps running.
 - **Game over** when remaining time is 0 and there is no live shot, a buzzer-beater miss, or a buzzer-beater **make** (the basket counts, then the run ends).
+- Ranked **embed** still waits for RN `startRun` / `BeginEmbedMatch` (server epochs); arcade does not.
 
 ## Input
 
@@ -33,7 +34,7 @@ Timed **skill run** for stakes-fair play: one possession you feed with good shot
 2. **Hoop** — scored, touched rim (rim wins if both rim and glass) → `pointsHoop`
 3. **Backboard** — scored, glass only → `pointsBackboard`
 
-First make starts the clock with **`gameTime`**. Later makes only add score. Continue grants `clockContinueSeconds`. Slow-mo uses `buzzerTimeScale`.
+Clock starts on launch with **`gameTime`**. Makes only add score. Continue grants `clockContinueSeconds`. Slow-mo uses `buzzerTimeScale`.
 
 Shipped defaults: perfect 3 / hoop 2 / backboard 1; **gameTime 60s**; continue 8s; buzzerTimeScale 0.3.
 

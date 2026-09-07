@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -81,16 +81,23 @@ public class Game : MonoBehaviour
         if (Progress.Instance != null && Progress.Instance.currentBallSkin != null)
             ball.SetSkin(Progress.Instance.currentBallSkin);
         ui.UpdateScores(true);
-        // Ranked embed waits for RN startRun; arcade mode freezes until first make.
+        // Ranked embed waits for RN startRun. Arcade / editor: clock runs from launch.
         if (!embedMatchMode)
-            shotClock.ResetFrozen();
+            StartArcadeClock();
+    }
+
+    void StartArcadeClock()
+    {
+        float seconds = config != null && config.gameTime > 0f ? config.gameTime : 60f;
+        shotClock.StartClockExact(seconds);
+        GameAudio.Instance?.SetGameplayActive(true);
     }
 
     void Update()
     {
         // Must mirror ShotClock.Update's guard: the buzzer window runs at
         // timeScale 0.3 with input blocked, so its wall time is not run time.
-        // Unscaled delta is deliberate â€” a lowered timeScale must not buy budget.
+        // Unscaled delta is deliberate — a lowered timeScale must not buy budget.
         if (embedMatchMode && shotClock != null && shotClock.started && !paused
             && !shotClock.frozen && !shotClock.isBuzzerBeater)
             _embedElapsed += Time.unscaledDeltaTime;
@@ -113,7 +120,7 @@ public class Game : MonoBehaviour
     }
 
     /// <summary>
-    /// Snap playfield to a fresh embed idle. Synchronous â€” do not use arcade ResetGame.
+    /// Snap playfield to a fresh embed idle. Synchronous — do not use arcade ResetGame.
     /// </summary>
     public void ResetPlayfieldForEmbed()
     {
@@ -173,9 +180,10 @@ public class Game : MonoBehaviour
         ui?.UpdateScores(true);
         ui?.UpdateClock();
         GameAudio.Instance?.SetGameplayActive(true);
+        ProjectX.Effect.EffectEvents.RaiseRunStarted();
     }
 
-    /// <summary>Legacy float duration â€” derives a sync from now (tests / stub only).</summary>
+    /// <summary>Legacy float duration — derives a sync from now (tests / stub only).</summary>
     public void BeginEmbedMatch(
         float durationSeconds,
         string clientRunId,
@@ -191,10 +199,13 @@ public class Game : MonoBehaviour
 
     /// <summary>
     /// RN left / remounted before scorePayload, or next startRun after a finished payload.
-    /// Do not emit a payload â€” server owns zero on abort.
+    /// Do not emit a payload — server owns zero on abort.
     /// </summary>
     public void CancelEmbedMatch()
     {
+        // Without this, an aborted run leaves the ball trail emitting and
+        // popups animating until the next run starts.
+        ProjectX.Effect.EffectEvents.RaiseRunEnded();
         ResetPlayfieldForEmbed();
         embedMatchMode = false;
         Pause();
@@ -210,6 +221,14 @@ public class Game : MonoBehaviour
         if (embedMatchMode)
             AppendEmbedShot(true, p);
 
+        // Raised before the buzzer can resolve: ResolveBuzzerMake may end the
+        // run, and this basket's feedback must not play over the game-over
+        // screen. Camera punch comes from the effect layer, which grades it by
+        // shot quality and combo — CameraShake is disabled at install so the
+        // two never write the camera transform together.
+        ProjectX.Effect.EffectEvents.RaiseBasket(
+            quality, p, hoop != null ? hoop.transform.position : transform.position);
+
         if (!shotClock.started)
             shotClock.StartClock(config.gameTime);
 
@@ -218,8 +237,6 @@ public class Game : MonoBehaviour
 
         ui.UpdateScores();
         GameAudio.Instance?.PlayScore(quality);
-        if (quality == ShotQuality.Perfect)
-            CameraShake.PlayPerfect();
         UpdateStage();
     }
 
@@ -246,6 +263,7 @@ public class Game : MonoBehaviour
     public void OnShotMissed()
     {
         shotClock.SetInFlight(false);
+        ProjectX.Effect.EffectEvents.RaiseMiss();
 
         if (embedMatchMode)
             AppendEmbedShot(false, 0);
@@ -286,11 +304,14 @@ public class Game : MonoBehaviour
 
         Resume();
         ball.animator.updateMode = AnimatorUpdateMode.Normal;
+        if (!embedMatchMode)
+            StartArcadeClock();
     }
 
     public void GameOver()
     {
         shotClock.SetInFlight(false);
+        ProjectX.Effect.EffectEvents.RaiseRunEnded();
         if (embedMatchMode)
         {
             EmitEmbedScorePayload();
@@ -312,8 +333,7 @@ public class Game : MonoBehaviour
     {
         paused = false;
         Time.timeScale = 1;
-        if (embedMatchMode)
-            GameAudio.Instance?.SetGameplayActive(true);
+        GameAudio.Instance?.SetGameplayActive(true);
     }
 
     public void ContinueOnce()
@@ -332,6 +352,7 @@ public class Game : MonoBehaviour
     {
         shotClock.SetInFlight(true);
         GameAudio.Instance?.PlayThrow();
+        ProjectX.Effect.EffectEvents.RaiseLaunch();
     }
 
     void AppendEmbedShot(bool make, int points)

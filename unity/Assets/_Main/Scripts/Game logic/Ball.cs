@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System;
 using System.Collections;
 
@@ -87,6 +87,7 @@ public class Ball : MonoBehaviour
         transform.position = p;
         transform.localScale = Vector3.one * BALL_SPAWN_SCALE;
         transform.eulerAngles = Vector3.zero;
+        ProjectX.Effect.EffectEvents.RaiseExitNetTunnel();
         shadow.enabled = false;
         shadow.transform.position = p + new Vector3(0, -0.5f, 0);
     }
@@ -124,6 +125,8 @@ public class Ball : MonoBehaviour
     IEnumerator RecycleFromOpposite()
     {
         resolving = true;
+        ProjectX.Effect.EffectEvents.RaiseExitNetTunnel();
+        GameAudio.Instance?.PlayGroundBounce();
         if (gravityRoutine != null)
         {
             StopCoroutine(gravityRoutine);
@@ -148,7 +151,10 @@ public class Ball : MonoBehaviour
         if (collider.tag == "RimTrigger")
         {
             if (collider.name == "Top trigger")
+            {
                 passed[0] = true;
+                ProjectX.Effect.EffectEvents.RaiseEnterNetTunnel();
+            }
             else if (collider.name == "Bottom trigger" && passed[0])
             {
                 passed[1] = true;
@@ -178,12 +184,23 @@ public class Ball : MonoBehaviour
             rb.linearVelocity = FixVelocity();
             touchedRim = true;
             GameAudio.Instance?.PlayRim();
+            ProjectX.Effect.EffectEvents.RaiseRimHit(ContactPoint(collision));
         }
         else if (n == "Backboard")
         {
             touchedBackboard = true;
             GameAudio.Instance?.PlayBackboard();
+            ProjectX.Effect.EffectEvents.RaiseBackboardHit(ContactPoint(collision));
         }
+    }
+
+    /// <summary>Contact point for VFX, falling back to the ball when Box2D reports none.</summary>
+    Vector3 ContactPoint(Collision2D collision)
+    {
+        if (collision.contactCount > 0)
+            return collision.GetContact(0).point;
+
+        return transform.position;
     }
 
     private Vector2 FixVelocity()

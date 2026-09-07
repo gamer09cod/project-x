@@ -112,7 +112,14 @@ public class UI : MonoBehaviour
             return;
 
         ShotClock sc = Game.Instance.shotClock;
-        clock.text = sc.started ? sc.remaining.ToString("0.0") : "--";
+        if (!sc.started)
+        {
+            clock.text = "--";
+            return;
+        }
+
+        int seconds = Mathf.CeilToInt(Mathf.Max(0f, sc.remaining));
+        clock.text = seconds.ToString();
     }
 
     public void GameOver()

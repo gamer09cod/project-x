@@ -155,6 +155,7 @@ public class ShotClock : MonoBehaviour
             scale = BuzzerTimeScale;
         Time.timeScale = scale;
         GameAudio.Instance?.PlayBuzzer();
+        ProjectX.Effect.EffectEvents.RaiseBuzzerBegin();
     }
 
     public void ResolveBuzzerMake()
@@ -169,9 +170,12 @@ public class ShotClock : MonoBehaviour
             game.hasUsedBuzzerBeater = true;
             game.buzzerBeaterTriggered = true;
             AddTime(Game.EmbedBuzzerBonusSeconds);
+            ProjectX.Effect.EffectEvents.RaiseBuzzerResolved(true, true);
             return;
         }
 
+        // Made, but no extension: announce the make without promising time.
+        ProjectX.Effect.EffectEvents.RaiseBuzzerResolved(true, false);
         remaining = 0;
         game.GameOver();
     }
@@ -181,6 +185,7 @@ public class ShotClock : MonoBehaviour
         EndBuzzerVisual();
         isBuzzerBeater = false;
         inFlight = false;
+        ProjectX.Effect.EffectEvents.RaiseBuzzerResolved(false, false);
         game.GameOver();
     }
 
