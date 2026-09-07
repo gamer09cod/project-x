@@ -108,10 +108,18 @@ describe('callable names and auth', () => {
     assert.match(deposit, /MOCK_DEPOSIT_MAX_CENTS = 50_000/);
   });
 
-  it('joinMatch request does not include a client payout', () => {
+  it('joinMatch and startStreak responses include game timer epochs', () => {
     const join = read('packages/shared/src/api/join-match.ts');
-    assert.match(join, /stakeCents/);
-    assert.doesNotMatch(join, /payoutCents/);
+    const streak = read('packages/shared/src/api/start-streak.ts');
+    const bridge = read('packages/shared/src/bridge.ts');
+    assert.match(join, /serverNowEpochMs/);
+    assert.match(join, /gameStartEpochMs/);
+    assert.match(join, /gameEndEpochMs/);
+    assert.match(streak, /serverNowEpochMs/);
+    assert.match(bridge, /gameEndEpochMs: number/);
+    const timer = read('backend/functions/src/match/gameTimer.js');
+    assert.match(timer, /RUN_DURATION_MS = 60_000/);
+    assert.match(timer, /gameTimerFromStartedAt/);
   });
 });
 

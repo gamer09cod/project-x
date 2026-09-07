@@ -18,13 +18,14 @@ public class GameAudio : MonoBehaviour
     public AudioClip scorePerfect;
     public AudioClip scoreHoop;
     public AudioClip scoreBackboard;
-    
+
     [Header("BgMusic")]
     public AudioClip bgMusic;
 
     AudioSource source;
     AudioSource musicSource;
     float lastHitTime;
+    bool _allowMusic;
 
     public static GameAudio Instance
     {
@@ -44,24 +45,51 @@ public class GameAudio : MonoBehaviour
             source = gameObject.AddComponent<AudioSource>();
         source.playOnAwake = false;
         source.spatialBlend = 0f;
-        source.ignoreListenerPause = true;
+        // Must respect AudioListener.pause — RN pauseUnity / app background.
+        source.ignoreListenerPause = false;
         source.loop = false;
 
         musicSource = gameObject.AddComponent<AudioSource>();
         musicSource.playOnAwake = false;
         musicSource.spatialBlend = 0f;
-        musicSource.ignoreListenerPause = true;
+        musicSource.ignoreListenerPause = false;
         musicSource.loop = true;
     }
 
     void Start()
     {
-        PlayBgMusic();
+        // Do not auto-play: embed host stays mounted behind results/tabs.
+        // BeginEmbedMatch / SetGameplayActive(true) starts music.
+        StopAll();
+    }
+
+    /// <summary>
+    /// Enable music+SFX for an active embed run. Call from BeginEmbedMatch / Resume.
+    /// </summary>
+    public void SetGameplayActive(bool active)
+    {
+        _allowMusic = active;
+        if (active)
+            PlayBgMusic();
+        else
+            StopAll();
+    }
+
+    public void StopAll()
+    {
+        _allowMusic = false;
+        if (musicSource != null)
+        {
+            musicSource.Stop();
+            musicSource.clip = null;
+        }
+        if (source != null)
+            source.Stop();
     }
 
     public void PlayBgMusic()
     {
-        if (!bgMusic || !musicSource)
+        if (!_allowMusic || !bgMusic || !musicSource)
             return;
         if (musicSource.isPlaying && musicSource.clip == bgMusic)
             return;
@@ -107,8 +135,32 @@ public class GameAudio : MonoBehaviour
         Play(clip, 1f);
     }
 
+    void OnApplicationPause(bool pauseStatus)
+    {
+        if (pauseStatus)
+            StopAll();
+    }
+
+    void OnApplicationFocus(bool hasFocus)
+    {
+        if (!hasFocus)
+        {
+            StopAll();
+            return;
+        }
+
+        // Android may resume the player on maximize; only restore music in an active run.
+        var game = Game.Instance;
+        if (game != null && game.embedMatchMode && !game.paused && _allowMusic)
+            PlayBgMusic();
+        else
+            StopAll();
+    }
+
     void PlayRandom(AudioClip[] clips, float volume, float minGap = 0f, float pitch = 1f)
     {
+        if (!_allowMusic)
+            return;
         if (clips == null || clips.Length == 0)
             return;
         if (minGap > 0f && Time.unscaledTime - lastHitTime < minGap)
@@ -120,7 +172,7 @@ public class GameAudio : MonoBehaviour
 
     void Play(AudioClip clip, float volume, float pitch = 1f)
     {
-        if (!clip || !source)
+        if (!_allowMusic || !clip || !source)
             return;
         source.pitch = pitch;
         source.PlayOneShot(clip, volume);

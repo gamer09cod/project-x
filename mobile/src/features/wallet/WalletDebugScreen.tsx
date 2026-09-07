@@ -124,6 +124,9 @@ export function WalletDebugScreen({
         scoreDeadlineAt: join.scoreDeadlineAt,
         opponentPostedScore: join.opponentPostedScore,
         clientRunId,
+        serverNowEpochMs: join.serverNowEpochMs,
+        gameStartEpochMs: join.gameStartEpochMs,
+        gameEndEpochMs: join.gameEndEpochMs,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -151,6 +154,9 @@ export function WalletDebugScreen({
         scoreDeadlineAt: streak.scoreDeadlineAt,
         opponentPostedScore: null,
         clientRunId,
+        serverNowEpochMs: streak.serverNowEpochMs,
+        gameStartEpochMs: streak.gameStartEpochMs,
+        gameEndEpochMs: streak.gameEndEpochMs,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

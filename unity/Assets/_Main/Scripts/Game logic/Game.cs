@@ -45,6 +45,10 @@ public class Game : MonoBehaviour
     [NonSerialized]
     public bool buzzerBeaterTriggered;
 
+    /// <summary>Server-synced play clock (embed). Null when idle.</summary>
+    [NonSerialized]
+    public ProjectX.Gameplay.AuthoritativeGameTimer authTimer;
+
     public UI ui;
     public Ball ball;
     public Hoop hoop;
@@ -84,7 +88,11 @@ public class Game : MonoBehaviour
 
     void Update()
     {
-        if (embedMatchMode && shotClock != null && shotClock.started && !paused)
+        // Must mirror ShotClock.Update's guard: the buzzer window runs at
+        // timeScale 0.3 with input blocked, so its wall time is not run time.
+        // Unscaled delta is deliberate — a lowered timeScale must not buy budget.
+        if (embedMatchMode && shotClock != null && shotClock.started && !paused
+            && !shotClock.frozen && !shotClock.isBuzzerBeater)
             _embedElapsed += Time.unscaledDeltaTime;
     }
 
@@ -134,16 +142,20 @@ public class Game : MonoBehaviour
         hoop?.ResetToIdle();
         shotClock?.ResetFrozen();
         shotClock?.SetInFlight(false);
+        if (authTimer != null)
+            authTimer.Clear();
         Resume();
         ui?.UpdateScores(true);
         ui?.UpdateClock();
     }
 
     /// <summary>
-    /// project-x RN handshake. Starts the 60s clock immediately; ends with scorePayload.
+    /// project-x RN handshake. Play clock starts immediately from server epochs.
     /// </summary>
     public void BeginEmbedMatch(
-        float durationSeconds,
+        long serverNowEpochMs,
+        long gameStartEpochMs,
+        long gameEndEpochMs,
         string clientRunId,
         string unityBuildId,
         Action<string> onScorePayloadEnvelope)
@@ -154,10 +166,27 @@ public class Game : MonoBehaviour
         _embedUnityBuildId = unityBuildId ?? "";
         _embedOnFinished = onScorePayloadEnvelope;
 
-        float seconds = durationSeconds > 0f ? durationSeconds : (config != null ? config.gameTime : 60f);
-        shotClock.StartClockExact(seconds);
+        if (authTimer == null)
+            authTimer = new ProjectX.Gameplay.AuthoritativeGameTimer();
+        authTimer.Sync(serverNowEpochMs, gameStartEpochMs, gameEndEpochMs);
+        shotClock.StartClockFromAuthTimer(authTimer);
         ui?.UpdateScores(true);
         ui?.UpdateClock();
+        GameAudio.Instance?.SetGameplayActive(true);
+    }
+
+    /// <summary>Legacy float duration — derives a sync from now (tests / stub only).</summary>
+    public void BeginEmbedMatch(
+        float durationSeconds,
+        string clientRunId,
+        string unityBuildId,
+        Action<string> onScorePayloadEnvelope)
+    {
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        long durMs = (long)(Mathf.Max(0f, durationSeconds) * 1000f);
+        if (durMs <= 0)
+            durMs = 60_000;
+        BeginEmbedMatch(now, now, now + durMs, clientRunId, unityBuildId, onScorePayloadEnvelope);
     }
 
     /// <summary>
@@ -276,12 +305,15 @@ public class Game : MonoBehaviour
     {
         paused = true;
         Time.timeScale = 0;
+        GameAudio.Instance?.SetGameplayActive(false);
     }
 
     public void Resume()
     {
         paused = false;
         Time.timeScale = 1;
+        if (embedMatchMode)
+            GameAudio.Instance?.SetGameplayActive(true);
     }
 
     public void ContinueOnce()

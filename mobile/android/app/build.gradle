@@ -7,11 +7,29 @@ apply plugin: "com.facebook.react"
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
-    /* Workspace hoist: react-native lives at the repo root. */
+    /* App package root is mobile/; RN deps are hoisted to the monorepo root. */
     root = file("../..")
     reactNativeDir = file("../../../node_modules/react-native")
     codegenDir = file("../../../node_modules/@react-native/codegen")
     cliFile = file("../../../node_modules/react-native/cli.js")
+
+    /*
+     * Hermes detection looks under `root` (mobile/), but hermes-compiler is
+     * at the repo-root node_modules. Point at it explicitly or release bundling fails.
+     */
+    def hermesOsBin =
+        System.getProperty("os.name").toLowerCase().contains("windows")
+            ? "win64-bin"
+            : System.getProperty("os.name").toLowerCase().contains("mac")
+                ? "osx-bin"
+                : "linux64-bin"
+    def hermesExe =
+        System.getProperty("os.name").toLowerCase().contains("windows")
+            ? "hermesc.exe"
+            : "hermesc"
+    hermesCommand =
+        file("../../../node_modules/hermes-compiler/hermesc/${hermesOsBin}/${hermesExe}")
+            .absolutePath
 
     /* Variants */
     //   The list of variants to that are debuggable. For those we're going to
@@ -68,6 +86,13 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -91,15 +116,31 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (hasReleaseKeystore) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Prefer mobile/android/keystore.properties (see keystore.properties.example).
+            // Without it, release still builds for local smoke but uses the debug keystore.
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.warn(
+                    "keystore.properties missing — signing release with debug keystore. " +
+                    "Run: npm run android:keystore --workspace=mobile"
+                )
+                signingConfig signingConfigs.debug
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

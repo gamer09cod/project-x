@@ -8,7 +8,7 @@
   },
   "scripts": {
     "lint": "eslint src",
-    "test": "node --test test/db.test.js test/schema.test.js test/contracts.test.js test/phase4.test.js test/phase5.test.js test/phase7.test.js test/phase8.test.js test/phase9.test.js",
+    "test": "node --test test/db.test.js test/schema.test.js test/contracts.test.js test/phase4.test.js test/phase5.test.js test/phase7.test.js test/phase8.test.js test/phase9.test.js test/plausibility.test.js",
     "serve": "firebase emulators:start --only functions"
   },
   "dependencies": {

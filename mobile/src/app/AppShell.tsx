@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {StatusBar, StyleSheet, View} from 'react-native';
 import type {
   Cents,
@@ -19,7 +19,6 @@ import {
   continueStreak,
   ensureProfile,
   getActiveStreak,
-  getWallet,
 } from '../services/callables';
 import {mapCallableError} from '../lib/callableErrors';
 import {BoostScreen} from '../features/boost/BoostScreen';
@@ -48,7 +47,7 @@ type Overlay =
       stakeCents: Cents;
       idempotencyKey: string;
     }
-  | {name: 'run'; params: MatchRunParams}
+  | {name: 'run'; params: MatchRunParams; warmUnity: boolean}
   | {name: 'result'; submit: SubmitScoreResponse; payload: ScorePayload};
 
 export function AppShell(): React.JSX.Element {
@@ -56,6 +55,7 @@ export function AppShell(): React.JSX.Element {
   const [overlay, setOverlay] = useState<Overlay>({name: 'none'});
   /** Keep Unity mounted after first join until AppShell unmounts (sign-out). */
   const [unitySession, setUnitySession] = useState(false);
+  const unitySessionRef = useRef(false);
   const [balanceCents, setBalanceCents] = useState<number | null>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [activatedBoostId, setActivatedBoostId] = useState<string | null>(null);
@@ -78,10 +78,10 @@ export function AppShell(): React.JSX.Element {
 
   const refreshWallet = useCallback(async () => {
     try {
-      await ensureProfile({});
-      const w = await getWallet();
-      setBalanceCents(w.balanceCents);
-      setRating(w.rating);
+      // ensureProfile already returns rating + balance — skip a second getWallet RTT.
+      const p = await ensureProfile({});
+      setBalanceCents(p.walletBalanceCents);
+      setRating(p.rating);
     } catch {
       // Profile tab still shows the detailed error.
     }
@@ -123,14 +123,19 @@ export function AppShell(): React.JSX.Element {
   };
 
   const enterRun = useCallback((params: MatchRunParams) => {
+    const warmUnity = unitySessionRef.current;
+    unitySessionRef.current = true;
     setUnitySession(true);
-    setOverlay({name: 'run', params});
+    setOverlay({name: 'run', params, warmUnity});
   }, []);
 
   const runFromStreak = (args: {
     matchId: Uuid;
     stakeCents: Cents;
     scoreDeadlineAt: string;
+    serverNowEpochMs: number;
+    gameStartEpochMs: number;
+    gameEndEpochMs: number;
     streakId: Uuid;
     currentLeg?: 1 | 2 | 3;
     targetScore?: number;
@@ -144,6 +149,9 @@ export function AppShell(): React.JSX.Element {
       scoreDeadlineAt: args.scoreDeadlineAt as MatchRunParams['scoreDeadlineAt'],
       opponentPostedScore: null,
       clientRunId: newIdempotencyKey() as Uuid,
+      serverNowEpochMs: args.serverNowEpochMs,
+      gameStartEpochMs: args.gameStartEpochMs,
+      gameEndEpochMs: args.gameEndEpochMs,
       streakId: args.streakId,
       currentLeg: args.currentLeg,
       targetScore: args.targetScore,
@@ -168,6 +176,7 @@ export function AppShell(): React.JSX.Element {
     body = (
       <MatchRunScreen
         params={overlay.params}
+        warmUnity={overlay.warmUnity}
         onCancel={goTabs}
         onFinished={({submit, payload}) => recordResult(submit, payload)}
       />
@@ -261,7 +270,10 @@ export function AppShell(): React.JSX.Element {
                 if (
                   !activeStreak?.canResumeRun ||
                   !activeStreak.pveMatchId ||
-                  !activeStreak.scoreDeadlineAt
+                  !activeStreak.scoreDeadlineAt ||
+                  activeStreak.serverNowEpochMs == null ||
+                  activeStreak.gameStartEpochMs == null ||
+                  activeStreak.gameEndEpochMs == null
                 ) {
                   return;
                 }
@@ -269,6 +281,9 @@ export function AppShell(): React.JSX.Element {
                   matchId: activeStreak.pveMatchId,
                   stakeCents: activeStreak.stakeCents,
                   scoreDeadlineAt: activeStreak.scoreDeadlineAt,
+                  serverNowEpochMs: activeStreak.serverNowEpochMs,
+                  gameStartEpochMs: activeStreak.gameStartEpochMs,
+                  gameEndEpochMs: activeStreak.gameEndEpochMs,
                   streakId: activeStreak.streakId,
                   currentLeg: activeStreak.currentLeg,
                   targetScore:
@@ -292,6 +307,9 @@ export function AppShell(): React.JSX.Element {
                       matchId: next.pveMatchId,
                       stakeCents: next.stakeCents,
                       scoreDeadlineAt: next.scoreDeadlineAt,
+                      serverNowEpochMs: next.serverNowEpochMs,
+                      gameStartEpochMs: next.gameStartEpochMs,
+                      gameEndEpochMs: next.gameEndEpochMs,
                       streakId: next.streakId,
                       currentLeg: next.currentLeg,
                       targetScore: next.targetScore,
@@ -340,6 +358,8 @@ export function AppShell(): React.JSX.Element {
           ) : null}
           {tab === 'profile' ? (
             <ProfileScreen
+              initialBalanceCents={balanceCents}
+              initialRating={rating}
               onWalletChange={(cents, nextRating) => {
                 setBalanceCents(cents);
                 setRating(nextRating);
@@ -352,7 +372,7 @@ export function AppShell(): React.JSX.Element {
           boostCount={boostInventoryCount}
           onChange={next => {
             setTab(next);
-            if (next === 'profile' || next === 'play' || next === 'results') {
+            if (next === 'play' || next === 'results') {
               refreshWallet();
             }
             if (next === 'play') {

@@ -11,6 +11,7 @@ const {
 const { applyLedger, getBalance } = require('../ledger');
 const { loadActiveUser, hasActiveMatch, hasActiveStreak } = require('../users');
 const { consumeBoostForJoin } = require('./boosts');
+const { gameTimerFromStartedAt } = require('./gameTimer');
 
 const GAME_ID = 'basketball_v1';
 
@@ -62,6 +63,8 @@ async function rebuildJoinResponse(client, joinKey) {
   const matchStatus =
     Number(row.seat) === 2 ? MATCH_STATUS.PAIRED : MATCH_STATUS.LIVE;
 
+  const timer = gameTimerFromStartedAt(row.started_at);
+
   return {
     matchId: row.match_id,
     matchPlayerId: row.match_player_id,
@@ -71,6 +74,9 @@ async function rebuildJoinResponse(client, joinKey) {
     stakeCents: Number(row.stake_cents),
     startedAt: new Date(row.started_at).toISOString(),
     scoreDeadlineAt: new Date(row.score_deadline_at).toISOString(),
+    serverNowEpochMs: timer.serverNowEpochMs,
+    gameStartEpochMs: timer.gameStartEpochMs,
+    gameEndEpochMs: timer.gameEndEpochMs,
     boostId: row.boost_id,
     boost: row.boost_id
       ? {
@@ -249,6 +255,7 @@ async function joinMatchHandler(request) {
       stakeCents,
       startedAt: new Date(player.rows[0].started_at).toISOString(),
       scoreDeadlineAt: new Date(player.rows[0].score_deadline_at).toISOString(),
+      ...gameTimerFromStartedAt(player.rows[0].started_at),
       boostId: consumed ? consumed.boostId : null,
       boost: consumed
         ? {

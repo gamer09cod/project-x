@@ -72,6 +72,7 @@ export type {
   GetWalletResponse,
   JoinMatchRequest,
   JoinMatchResponse,
+  GameTimerEpochs,
   ListBoostsRequest,
   ListBoostsResponse,
   PlayerBoost,

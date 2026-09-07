@@ -66,12 +66,27 @@ export function BoostScreen({
     setLoading(true);
     setError(null);
     try {
-      await ensureProfile({});
+      // Profile was ensured at AppShell mount — avoid a second RTT before listBoosts.
       const res = await listBoosts();
       setBoosts(Array.isArray(res.boosts) ? res.boosts : []);
       onInventoryCount?.(res.boosts?.length ?? 0);
     } catch (e) {
       const mapped = mapCallableError(e);
+      if (mapped.code === 'not-found' || /ensureProfile|Call ensureProfile/i.test(mapped.message)) {
+        try {
+          await ensureProfile({});
+          const res = await listBoosts();
+          setBoosts(Array.isArray(res.boosts) ? res.boosts : []);
+          onInventoryCount?.(res.boosts?.length ?? 0);
+          setError(null);
+          return;
+        } catch (retryErr) {
+          setError(mapCallableError(retryErr).message);
+          setBoosts([]);
+          onInventoryCount?.(0);
+          return;
+        }
+      }
       const hint =
         mapped.code === 'not-found' || /listBoosts/i.test(mapped.message)
           ? ' Deploy functions so listBoosts exists, then pull to refresh.'

@@ -26,9 +26,25 @@ namespace ProjectX.Gameplay
                 return;
             }
 
-            float seconds = config.RunDurationMs > 0 ? config.RunDurationMs / 1000f : 60f;
+            long serverNow = config.ServerNowEpochMs;
+            long gameStart = config.GameStartEpochMs;
+            long gameEnd = config.GameEndEpochMs;
+            if (serverNow <= 0 || gameStart <= 0 || gameEnd <= gameStart)
+            {
+                // Fallback for old clients / tests — prefer server epochs.
+                float seconds = config.RunDurationMs > 0 ? config.RunDurationMs / 1000f : 60f;
+                game.BeginEmbedMatch(
+                    seconds,
+                    config.ClientRunId,
+                    UnityBuildId.Value,
+                    onFinished);
+                return;
+            }
+
             game.BeginEmbedMatch(
-                seconds,
+                serverNow,
+                gameStart,
+                gameEnd,
                 config.ClientRunId,
                 UnityBuildId.Value,
                 onFinished);

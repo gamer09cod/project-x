@@ -17,6 +17,9 @@ namespace ProjectX.Bridge
         public int? OpponentPostedScore;
         public string ScoreDeadlineAt;
         public int RunDurationMs;
+        public long ServerNowEpochMs;
+        public long GameStartEpochMs;
+        public long GameEndEpochMs;
     }
 
     /// <summary>
@@ -220,7 +223,43 @@ namespace ProjectX.Bridge
                 OpponentPostedScore = opponent,
                 ScoreDeadlineAt = ExtractJsonString(json, "scoreDeadlineAt"),
                 RunDurationMs = runDuration,
+                ServerNowEpochMs = ExtractJsonLong(json, "serverNowEpochMs", 0),
+                GameStartEpochMs = ExtractJsonLong(json, "gameStartEpochMs", 0),
+                GameEndEpochMs = ExtractJsonLong(json, "gameEndEpochMs", 0),
             };
+        }
+
+        internal static long ExtractJsonLong(string json, string key, long fallback)
+        {
+            var needle = "\"" + key + "\":";
+            var start = json.IndexOf(needle);
+            if (start < 0)
+            {
+                return fallback;
+            }
+            start += needle.Length;
+            while (start < json.Length && (json[start] == ' ' || json[start] == '\t'))
+            {
+                start++;
+            }
+            var end = start;
+            if (end < json.Length && json[end] == '-')
+            {
+                end++;
+            }
+            while (end < json.Length && char.IsDigit(json[end]))
+            {
+                end++;
+            }
+            if (end == start || (end == start + 1 && json[start] == '-'))
+            {
+                return fallback;
+            }
+            if (long.TryParse(json.Substring(start, end - start), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+            {
+                return value;
+            }
+            return fallback;
         }
 
         internal static string ExtractJsonString(string json, string key)

@@ -2,6 +2,7 @@ import type { Cents } from "../money";
 import type { IsoTimestamp, Uuid } from "../ids";
 import type { MatchStatus, StreakStatus } from "../domain";
 import type { MutationAuth } from "./errors";
+import type { GameTimerEpochs } from "./join-match";
 
 export const START_STREAK = "startStreak" as const;
 export const CONTINUE_STREAK = "continueStreak" as const;
@@ -37,9 +38,10 @@ export type StreakRunResponse = {
   /** Wall-clock deadline; unfinished legs after this → forfeit, no refund. */
   expiresAt: IsoTimestamp;
   startedAt: IsoTimestamp;
+  /** Submit window (started_at + 75s). */
   scoreDeadlineAt: IsoTimestamp;
   walletBalanceCents: Cents;
-};
+} & GameTimerEpochs;
 
 export type StartStreakResponse = StreakRunResponse;
 
@@ -101,6 +103,9 @@ export type StreakSnapshot = {
   matchPlayerId: Uuid | null;
   startedAt: IsoTimestamp | null;
   scoreDeadlineAt: IsoTimestamp | null;
+  serverNowEpochMs: number | null;
+  gameStartEpochMs: number | null;
+  gameEndEpochMs: number | null;
   /** Next unpaid leg is waiting for continueStreak. */
   canContinue: boolean;
   /** Remount Unity on the current live PvE match. */

@@ -16,6 +16,29 @@ const MAX_DURATION_MS =
 
 /** Locked to Swish Shot game_config: Perfect 3 / Hoop 2 / Backboard 1 / miss 0. */
 const MAKE_POINTS_ALLOWED = new Set([1, 2, 3]);
+const PERFECT_POINTS = 3;
+
+/**
+ * Stage 1 plausibility envelope (DECISIONS.md §1.3).
+ *
+ * Shadow mode by default: signals are recorded for calibration and never change
+ * the accepted score. Enforcement is off until SCORE_PLAUSIBILITY_ENFORCE=1.
+ *
+ * These are seed thresholds derived from Swish Shot animation constants, NOT
+ * from observed play. A shot cannot repeat faster than the ball recycle
+ * (Ball.RECYCLE_DURATION 0.35s) plus reset (AnimationDurations.RESET_BALL 10/60s)
+ * plus flight time, so 350ms is a floor no honest run can cross. Retune every
+ * threshold against match_players.score_plausibility before enforcing.
+ */
+const MIN_SHOT_INTERVAL_MS = 350;
+const PERFECT_RATIO_CEILING = 0.9;
+const PERFECT_RATIO_MIN_SAMPLE = 5;
+const TIMING_STDEV_FLOOR_MS = 25;
+const TIMING_STDEV_MIN_SAMPLE = 5;
+const BUZZER_EVIDENCE_WINDOW_MS = 8_000;
+
+/** Availability guard, ~30x the largest physically possible run. */
+const MAX_SHOT_LOG_ENTRIES = 2_000;
 
 /**
  * Strict schema parse. Invalid → HttpsError (reject callable, do not zero).
@@ -65,6 +88,9 @@ function parseScorePayload(payload) {
   if (!Array.isArray(p.shotLog)) {
     fail('invalid_argument', 'shotLog must be an array', 'invalid-argument');
   }
+  if (p.shotLog.length > MAX_SHOT_LOG_ENTRIES) {
+    fail('invalid_argument', 'shotLog too long', 'invalid-argument');
+  }
 
   /** @type {Array<{ tMs: number, result: string, pointsClaimed: number }>} */
   const shotLog = [];
@@ -108,13 +134,161 @@ function parseScorePayload(payload) {
   };
 }
 
+function median(sorted) {
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function stdev(values) {
+  let sum = 0;
+  for (const v of values) sum += v;
+  const mean = sum / values.length;
+  let sq = 0;
+  for (const v of values) sq += (v - mean) * (v - mean);
+  return Math.sqrt(sq / values.length);
+}
+
+/** Keep telemetry rows small and stable to compare across runs. */
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Describe a run against the plausibility envelope. Pure; never throws.
+ *
+ * Returns metrics for calibration and any signals that tripped. A signal means
+ * "this run does not look like human play", not "this run is a forgery" — the
+ * caller decides whether to act on it.
+ *
+ * @param {ReturnType<typeof parseScorePayload>} parsed
+ * @returns {{ metrics: Record<string, number | boolean | null>, signals: Array<{ code: string, value: number, threshold: number }> }}
+ */
+function assessPlausibility(parsed) {
+  const log = parsed.shotLog;
+  const gaps = [];
+  let makes = 0;
+  let perfect = 0;
+  let lastMakeMs = -1;
+
+  for (let i = 0; i < log.length; i++) {
+    if (log[i].result === 'make') {
+      makes += 1;
+      lastMakeMs = log[i].tMs;
+      if (log[i].pointsClaimed === PERFECT_POINTS) perfect += 1;
+    }
+    if (i > 0) gaps.push(log[i].tMs - log[i - 1].tMs);
+  }
+
+  let minGapMs = null;
+  for (const g of gaps) {
+    if (minGapMs === null || g < minGapMs) minGapMs = g;
+  }
+  const sortedGaps = gaps.slice().sort((a, b) => a - b);
+  const perfectRatio = makes > 0 ? round2(perfect / makes) : null;
+  const gapStdevMs = gaps.length > 0 ? round2(stdev(gaps)) : null;
+
+  const metrics = {
+    shots: log.length,
+    makes,
+    misses: log.length - makes,
+    perfect,
+    perfectRatio,
+    minGapMs,
+    medianGapMs: gaps.length > 0 ? median(sortedGaps) : null,
+    gapStdevMs,
+    shotsPerMinute:
+      parsed.durationMs > 0
+        ? round2((log.length * 60_000) / parsed.durationMs)
+        : null,
+    durationMs: parsed.durationMs,
+    score: parsed.score,
+    hasUsedBuzzerBeater: parsed.hasUsedBuzzerBeater,
+  };
+
+  const signals = [];
+  const maxShots = Math.floor(parsed.durationMs / MIN_SHOT_INTERVAL_MS) + 1;
+
+  if (minGapMs !== null && minGapMs < MIN_SHOT_INTERVAL_MS) {
+    signals.push({
+      code: 'shot_interval_below_floor',
+      value: minGapMs,
+      threshold: MIN_SHOT_INTERVAL_MS,
+    });
+  }
+  if (log.length > maxShots) {
+    signals.push({
+      code: 'shot_count_above_ceiling',
+      value: log.length,
+      threshold: maxShots,
+    });
+  }
+  if (makes >= PERFECT_RATIO_MIN_SAMPLE && perfectRatio > PERFECT_RATIO_CEILING) {
+    signals.push({
+      code: 'perfect_ratio_above_ceiling',
+      value: perfectRatio,
+      threshold: PERFECT_RATIO_CEILING,
+    });
+  }
+  // Human tap timing jitters; scripted input does not.
+  if (gaps.length >= TIMING_STDEV_MIN_SAMPLE && gapStdevMs < TIMING_STDEV_FLOOR_MS) {
+    signals.push({
+      code: 'timing_variance_below_floor',
+      value: gapStdevMs,
+      threshold: TIMING_STDEV_FLOOR_MS,
+    });
+  }
+  // A run past the base clock only happens if a buzzer-beater make bought +5s,
+  // so the log must show a make near the boundary rather than just a true flag.
+  if (parsed.durationMs > RUN_DURATION_MS + SCORE_DURATION_SLACK_MS) {
+    const evidenceFrom = RUN_DURATION_MS - BUZZER_EVIDENCE_WINDOW_MS;
+    if (lastMakeMs < evidenceFrom) {
+      signals.push({
+        code: 'buzzer_not_evidenced',
+        value: lastMakeMs,
+        threshold: evidenceFrom,
+      });
+    }
+  }
+
+  return { metrics, signals };
+}
+
+/** Shadow by default; only an explicit opt-in lets signals zero a score. */
+function plausibilityEnforced() {
+  return String(process.env.SCORE_PLAUSIBILITY_ENFORCE || '').trim() === '1';
+}
+
 /**
  * Deterministic checks after a valid parse. First failure → acceptedScore 0.
  * @param {ReturnType<typeof parseScorePayload>} parsed
- * @param {{ boundClientRunId: string | null, unityBuildAllowlist: string[] | null }} opts
- * @returns {{ acceptedScore: number, checkFailed: boolean, failReason: string | null }}
+ * @param {{ boundClientRunId: string | null, unityBuildAllowlist: string[] | null, enforcePlausibility?: boolean }} opts
+ * @returns {{ acceptedScore: number, checkFailed: boolean, failReason: string | null, plausibility: ReturnType<typeof assessPlausibility> }}
  */
 function verifyScorePayload(parsed, opts) {
+  const base = runDeterministicChecks(parsed, opts);
+  const plausibility = assessPlausibility(parsed);
+
+  // A deterministic failure already zeroed the score; keep its reason.
+  if (base.checkFailed) {
+    return { ...base, plausibility };
+  }
+
+  const enforce =
+    opts.enforcePlausibility === undefined
+      ? plausibilityEnforced()
+      : opts.enforcePlausibility;
+
+  if (enforce && plausibility.signals.length > 0) {
+    return {
+      ...zero(`implausible_${plausibility.signals[0].code}`),
+      plausibility,
+    };
+  }
+
+  return { ...base, plausibility };
+}
+
+function runDeterministicChecks(parsed, opts) {
   const bound = opts.boundClientRunId;
   if (bound != null && bound !== parsed.clientRunId) {
     return zero('client_run_id_mismatch');
@@ -194,10 +368,16 @@ function loadUnityBuildAllowlist() {
 module.exports = {
   parseScorePayload,
   verifyScorePayload,
+  assessPlausibility,
+  plausibilityEnforced,
   loadUnityBuildAllowlist,
   MAX_DURATION_MS,
   RUN_DURATION_MS,
   BUZZER_BEATER_BONUS_MS,
   SCORE_DURATION_SLACK_MS,
   MAKE_POINTS_ALLOWED,
+  MAX_SHOT_LOG_ENTRIES,
+  MIN_SHOT_INTERVAL_MS,
+  PERFECT_RATIO_CEILING,
+  TIMING_STDEV_FLOOR_MS,
 };

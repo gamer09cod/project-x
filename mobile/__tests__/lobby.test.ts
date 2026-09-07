@@ -26,11 +26,15 @@ test('snapshotFromStreakRun keeps server targets', () => {
     expiresAt: '2026-09-07T00:00:00.000Z' as never,
     startedAt: '2026-09-06T00:00:00.000Z' as never,
     scoreDeadlineAt: '2026-09-06T00:01:15.000Z' as never,
+    serverNowEpochMs: 1_000_000,
+    gameStartEpochMs: 1_000_000,
+    gameEndEpochMs: 1_060_000,
     walletBalanceCents: cents(500),
   });
   expect(snap.targetScores).toEqual([12, 15, 18]);
   expect(snap.canResumeRun).toBe(true);
   expect(snap.currentLeg).toBe(1);
+  expect(snap.gameEndEpochMs).toBe(1_060_000);
 });
 
 test('formatCentsDisplay pads cents', () => {

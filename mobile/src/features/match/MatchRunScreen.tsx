@@ -33,6 +33,9 @@ export type MatchRunParams = {
   scoreDeadlineAt: IsoTimestamp;
   opponentPostedScore: number | null;
   clientRunId: Uuid;
+  serverNowEpochMs: number;
+  gameStartEpochMs: number;
+  gameEndEpochMs: number;
   streakId?: Uuid;
   currentLeg?: 1 | 2 | 3;
   targetScore?: number;
@@ -42,6 +45,8 @@ export type MatchRunParams = {
 
 type Props = {
   params: MatchRunParams;
+  /** True when UnityPlayer was already mounted this sign-in (skip long cold wait). */
+  warmUnity?: boolean;
   onFinished: (result: {
     submit: SubmitScoreResponse;
     payload: ScorePayload;
@@ -49,10 +54,12 @@ type Props = {
   onCancel: () => void;
 };
 
-const HANDSHAKE_TICK_MS = 450;
+const HANDSHAKE_TICK_MS = 200;
 const HANDSHAKE_TIMEOUT_MS = 15000;
-/** Let a cold or re-shown surface settle before postMessage. */
-const COLD_START_MS = 600;
+/** Cold surface settle before first postMessage (first Unity mount). */
+const COLD_START_MS = 250;
+/** Session already has a live player — only wait for unpause/layout. */
+const WARM_START_MS = 50;
 
 /**
  * Money-safe: only shown after join succeeds.
@@ -60,6 +67,7 @@ const COLD_START_MS = 600;
  */
 export function MatchRunScreen({
   params,
+  warmUnity = false,
   onFinished,
   onCancel,
 }: Props): React.JSX.Element {
@@ -129,7 +137,7 @@ export function MatchRunScreen({
     const cold = setTimeout(() => {
       coldReadyRef.current = true;
       setStatus('Bridging…');
-    }, COLD_START_MS);
+    }, warmUnity ? WARM_START_MS : COLD_START_MS);
 
     setMessageHandler(raw => {
       const msg = parseUnityMessage(raw);
@@ -197,6 +205,7 @@ export function MatchRunScreen({
     params.matchId,
     pause,
     setMessageHandler,
+    warmUnity,
   ]);
 
   useEffect(() => {
@@ -240,6 +249,9 @@ export function MatchRunScreen({
         stakeCents: params.stakeCents,
         opponentPostedScore: params.opponentPostedScore,
         scoreDeadlineAt: params.scoreDeadlineAt,
+        serverNowEpochMs: params.serverNowEpochMs,
+        gameStartEpochMs: params.gameStartEpochMs,
+        gameEndEpochMs: params.gameEndEpochMs,
       });
       setStatus('startRun sent · waiting for runReady…');
     };
@@ -313,7 +325,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   handoffOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#0b1420',
     justifyContent: 'center',
     padding: 24,

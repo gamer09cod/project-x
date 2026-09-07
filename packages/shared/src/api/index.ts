@@ -1,5 +1,5 @@
 export { JOIN_MATCH, joinMatchAuth } from "./join-match";
-export type { JoinMatchRequest, JoinMatchResponse } from "./join-match";
+export type { JoinMatchRequest, JoinMatchResponse, GameTimerEpochs } from "./join-match";
 
 export { LIST_BOOSTS, listBoostsAuth } from "./list-boosts";
 export type {

@@ -12,32 +12,36 @@ import type {EnsureProfileResponse} from '@project-x/shared';
 import {colors, radii} from '../../theme';
 import {formatCentsDisplay} from '../../lib/formatMoney';
 import {mapCallableError} from '../../lib/callableErrors';
-import {ensureProfile, getWallet} from '../../services/callables';
+import {ensureProfile} from '../../services/callables';
 import {appAuth} from '../../services/firebase';
 import {Glyph} from '../../components/Glyph';
 
 type Props = {
+  /** Seed from AppShell so the tab paints before the network round-trip. */
+  initialBalanceCents?: number | null;
+  initialRating?: number | null;
   onWalletChange?: (balanceCents: number, rating: number) => void;
 };
 
-export function ProfileScreen({onWalletChange}: Props): React.JSX.Element {
+export function ProfileScreen({
+  initialBalanceCents = null,
+  initialRating = null,
+  onWalletChange,
+}: Props): React.JSX.Element {
   const [profile, setProfile] = useState<EnsureProfileResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const email = appAuth().currentUser?.email ?? null;
+  const uid = appAuth().currentUser?.uid ?? '';
 
   const refresh = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
+      // Single callable: response already includes rating + walletBalanceCents.
       const p = await ensureProfile({});
-      const w = await getWallet();
-      setProfile({
-        ...p,
-        rating: w.rating,
-        walletBalanceCents: w.balanceCents,
-      });
-      onWalletChange?.(w.balanceCents, w.rating);
+      setProfile(p);
+      onWalletChange?.(p.walletBalanceCents, p.rating);
     } catch (e) {
       setError(mapCallableError(e).message);
     } finally {
@@ -53,7 +57,13 @@ export function ProfileScreen({onWalletChange}: Props): React.JSX.Element {
     profile?.displayName?.trim() ||
     email?.split('@')[0] ||
     profile?.firebaseUid.slice(0, 8) ||
+    uid.slice(0, 8) ||
     'Player';
+
+  const balanceCents = profile?.walletBalanceCents ?? initialBalanceCents;
+  const rating = profile?.rating ?? initialRating;
+  const status = profile?.status ?? null;
+  const showSeed = !profile && (balanceCents != null || rating != null);
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -64,14 +74,21 @@ export function ProfileScreen({onWalletChange}: Props): React.JSX.Element {
       <Text style={styles.name}>{name}</Text>
       {email ? <Text style={styles.email}>{email}</Text> : null}
 
-      {busy && !profile ? <ActivityIndicator color={colors.cash} /> : null}
+      {busy && !profile && !showSeed ? (
+        <ActivityIndicator color={colors.cash} />
+      ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {profile ? (
+      {profile || showSeed ? (
         <View style={styles.card}>
-          <Row label="Wallet" value={formatCentsDisplay(profile.walletBalanceCents)} />
-          <Row label="Rating" value={String(profile.rating)} />
-          <Row label="Status" value={profile.status} />
+          <Row
+            label="Wallet"
+            value={
+              balanceCents != null ? formatCentsDisplay(balanceCents) : '—'
+            }
+          />
+          <Row label="Rating" value={rating != null ? String(rating) : '—'} />
+          {status ? <Row label="Status" value={status} /> : null}
         </View>
       ) : null}
 
@@ -118,7 +135,7 @@ const styles = StyleSheet.create({
   email: {color: colors.textMuted, fontSize: 14},
   error: {color: colors.fail, textAlign: 'center'},
   card: {
-    width: '100%',
+    alignSelf: 'stretch',
     backgroundColor: colors.surface,
     borderRadius: radii.card,
     borderWidth: 1,
@@ -135,16 +152,19 @@ const styles = StyleSheet.create({
   rowLabel: {color: colors.textMuted, fontSize: 14},
   rowValue: {color: colors.textPrimary, fontSize: 16, fontWeight: '700'},
   refresh: {
-    marginTop: 8,
+    marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 20,
   },
   refreshLabel: {color: colors.cash, fontWeight: '700'},
   signOut: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.pill,
+    marginTop: 4,
     paddingVertical: 14,
     paddingHorizontal: 28,
+    borderRadius: radii.card,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  signOutLabel: {color: colors.textPrimary, fontWeight: '700'},
+  signOutLabel: {color: colors.fail, fontWeight: '700'},
 });

@@ -16,6 +16,7 @@ const {
   parseScorePayload,
   verifyScorePayload,
   loadUnityBuildAllowlist,
+  plausibilityEnforced,
 } = require('./verify');
 
 /**
@@ -252,6 +253,7 @@ async function submitScoreHandler(request) {
            status = $5,
            submit_idempotency_key = $4,
            client_run_id = COALESCE(client_run_id, $6::uuid),
+           score_plausibility = $7::jsonb,
            updated_at = now()
        WHERE id = $1`,
       [
@@ -261,6 +263,7 @@ async function submitScoreHandler(request) {
         idempotencyKey,
         MATCH_PLAYER_STATUS.SCORED,
         parsed.clientRunId,
+        JSON.stringify(verified.plausibility),
       ],
     );
 
@@ -269,6 +272,15 @@ async function submitScoreHandler(request) {
         matchId,
         reason: verified.failReason,
         claimed: parsed.score,
+      });
+    }
+
+    if (verified.plausibility.signals.length > 0) {
+      console.warn('submitScore plausibility signals', {
+        matchId,
+        enforced: plausibilityEnforced(),
+        signals: verified.plausibility.signals.map((s) => s.code),
+        metrics: verified.plausibility.metrics,
       });
     }
 

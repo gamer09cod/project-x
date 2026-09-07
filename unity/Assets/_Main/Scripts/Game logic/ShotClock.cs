@@ -11,6 +11,7 @@ public class ShotClock : MonoBehaviour
     public float remaining { get; private set; }
 
     Game game;
+    ProjectX.Gameplay.AuthoritativeGameTimer _authTimer;
 
     public void Bind(Game owner)
     {
@@ -25,11 +26,13 @@ public class ShotClock : MonoBehaviour
         inFlight = false;
         isBuzzerBeater = false;
         remaining = 0;
+        _authTimer = null;
         game.ui?.UpdateClock();
     }
 
     public void StartClock(float seconds)
     {
+        _authTimer = null;
         remaining = Mathf.Max(remaining, seconds);
         frozen = false;
         started = true;
@@ -39,15 +42,35 @@ public class ShotClock : MonoBehaviour
     /// <summary>Embed startRun: assign remaining, do not keep leftover time.</summary>
     public void StartClockExact(float seconds)
     {
+        _authTimer = null;
         remaining = Mathf.Max(0f, seconds);
         frozen = false;
         started = true;
         game.ui?.UpdateClock();
     }
 
+    /// <summary>Ranked embed: countdown from server epoch deadline.</summary>
+    public void StartClockFromAuthTimer(ProjectX.Gameplay.AuthoritativeGameTimer timer)
+    {
+        _authTimer = timer;
+        frozen = false;
+        started = true;
+        remaining = timer != null ? Mathf.Max(0f, timer.GetRemainingMs() / 1000f) : 0f;
+        game.ui?.UpdateClock();
+    }
+
     public void AddTime(float seconds)
     {
-        remaining += seconds;
+        if (_authTimer != null)
+        {
+            long bonusMs = (long)(Mathf.Max(0f, seconds) * 1000f);
+            _authTimer.ExtendPresentationEndMs(bonusMs);
+            remaining = Mathf.Max(0f, _authTimer.GetRemainingMs() / 1000f);
+        }
+        else
+        {
+            remaining += seconds;
+        }
         if (remaining > 0)
             frozen = false;
         game.ui?.UpdateClock();
@@ -84,7 +107,28 @@ public class ShotClock : MonoBehaviour
 
     void Update()
     {
-        if (game == null || game.paused || frozen || isBuzzerBeater || !started)
+        if (game == null || frozen || !started)
+            return;
+
+        if (_authTimer != null && game.embedMatchMode)
+        {
+            // Authoritative path: monotonic server estimate — keeps ticking while app is backgrounded.
+            remaining = Mathf.Max(0f, _authTimer.GetRemainingMs() / 1000f);
+            if (!game.paused && !isBuzzerBeater)
+                game.ui?.UpdateClock();
+
+            if (isBuzzerBeater || remaining > 0f)
+                return;
+
+            remaining = 0f;
+            if (inFlight)
+                BeginBuzzer();
+            else if (!game.paused)
+                game.OnClockExpired();
+            return;
+        }
+
+        if (game.paused || isBuzzerBeater)
             return;
 
         remaining -= Time.deltaTime;

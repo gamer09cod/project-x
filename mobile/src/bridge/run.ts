@@ -23,6 +23,9 @@ export type StartRunConfig = {
   mode?: StartRunMessage['mode'];
   gameId?: StartRunMessage['gameId'];
   runDurationMs?: number;
+  serverNowEpochMs: number;
+  gameStartEpochMs: number;
+  gameEndEpochMs: number;
 };
 
 export function makeStartRun(config: StartRunConfig): StartRunMessage {
@@ -38,6 +41,9 @@ export function makeStartRun(config: StartRunConfig): StartRunMessage {
     opponentPostedScore: config.opponentPostedScore,
     scoreDeadlineAt: config.scoreDeadlineAt,
     runDurationMs: config.runDurationMs ?? RUN_DURATION_MS,
+    serverNowEpochMs: config.serverNowEpochMs,
+    gameStartEpochMs: config.gameStartEpochMs,
+    gameEndEpochMs: config.gameEndEpochMs,
   };
 }
 

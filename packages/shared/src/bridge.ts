@@ -12,6 +12,7 @@ export type BridgeMessageVersion = typeof BRIDGE_MESSAGE_VERSION;
 /**
  * RN → Unity after joinMatch / startStreak succeeds.
  * Unity must not start a scored run without this handshake.
+ * Play clock: gameEndEpochMs is authoritative; remaining = end - estimatedServerNow.
  */
 export type StartRunMessage = {
   v: BridgeMessageVersion;
@@ -24,8 +25,13 @@ export type StartRunMessage = {
   /** Display only — Unity never pays out. */
   stakeCents: Cents;
   opponentPostedScore: number | null;
+  /** Submit/crash-scum window (ISO). Not the play clock. */
   scoreDeadlineAt: IsoTimestamp;
+  /** Display/debug duration; deadline epochs are authoritative. */
   runDurationMs: typeof RUN_DURATION_MS | number;
+  serverNowEpochMs: number;
+  gameStartEpochMs: number;
+  gameEndEpochMs: number;
 };
 
 /** RN → Unity when leaving mid-run or remounting (no scorePayload). */

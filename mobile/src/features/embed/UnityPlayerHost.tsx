@@ -8,7 +8,7 @@ import React, {
   type ReactNode,
   type RefObject,
 } from 'react';
-import {Platform, StyleSheet, View} from 'react-native';
+import {AppState, Platform, StyleSheet, View} from 'react-native';
 import UnityView from '@azesmway/react-native-unity';
 
 type MessageHandler = (raw: string) => void;
@@ -29,9 +29,9 @@ type Props = {
 
 /**
  * Session-scoped UnityPlayer (Phase B).
- * While a run is visible: same layout as the working build — UnityView flex:1,
- * RN HUD as absolute overlay (transparent). While hidden: Unity stays full-size
- * behind opaque screens (never 1×1 park). No resumeUnity() (azesmway#34).
+ * While a run is visible: UnityView flex:1, RN HUD as absolute overlay.
+ * While hidden: Unity stays full-size behind opaque UI, paused (audio muted).
+ * App background / inactive always pauses. No resumeUnity() (azesmway#34).
  */
 export function UnityPlayerHost({
   sessionActive,
@@ -40,39 +40,74 @@ export function UnityPlayerHost({
 }: Props): React.JSX.Element {
   const unityRef = useRef<UnityView>(null);
   const handlerRef = useRef<MessageHandler | null>(null);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
 
   const setMessageHandler = useCallback((handler: MessageHandler | null) => {
     handlerRef.current = handler;
   }, []);
 
-  const pause = useCallback(() => {
+  const setPaused = useCallback((paused: boolean) => {
+    const view = unityRef.current;
+    if (!view) {
+      return;
+    }
     try {
-      unityRef.current?.pauseUnity(true);
+      if (Platform.OS === 'android') {
+        view.windowFocusChanged(!paused);
+      }
+      view.pauseUnity(paused);
     } catch {
       // ignore
     }
   }, []);
 
+  const pause = useCallback(() => {
+    setPaused(true);
+  }, [setPaused]);
+
   useEffect(() => {
-    if (!sessionActive || !visible) {
+    if (!sessionActive) {
       return;
     }
-    const timer = setTimeout(() => {
-      const view = unityRef.current;
-      if (!view) {
-        return;
+
+    const sync = (appState = AppState.currentState) => {
+      const appActive = appState === 'active';
+      const shouldRun = visibleRef.current && appActive;
+      if (shouldRun) {
+        // Brief delay so the surface is laid out before unpausing.
+        const timer = setTimeout(() => setPaused(false), 80);
+        return () => clearTimeout(timer);
       }
-      try {
-        if (Platform.OS === 'android') {
-          view.windowFocusChanged(true);
-        }
-        view.pauseUnity(false);
-      } catch {
-        // ignore
+      setPaused(true);
+      // Android may auto-resume the player on window focus after maximize;
+      // keep forcing pause while the run overlay is hidden.
+      if (sessionActive && !visibleRef.current) {
+        const t1 = setTimeout(() => setPaused(true), 100);
+        const t2 = setTimeout(() => setPaused(true), 500);
+        const t3 = setTimeout(() => setPaused(true), 1200);
+        return () => {
+          clearTimeout(t1);
+          clearTimeout(t2);
+          clearTimeout(t3);
+        };
       }
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [sessionActive, visible]);
+      return undefined;
+    };
+
+    let clearUnpause = sync();
+
+    const sub = AppState.addEventListener('change', next => {
+      clearUnpause?.();
+      clearUnpause = sync(next);
+    });
+
+    return () => {
+      clearUnpause?.();
+      sub.remove();
+      setPaused(true);
+    };
+  }, [sessionActive, visible, setPaused]);
 
   const value = useMemo(
     () => ({unityRef, setMessageHandler, pause}),
@@ -122,10 +157,10 @@ const styles = StyleSheet.create({
   },
   /** Keep a real-sized surface under opaque tabs/result (do not use 1×1). */
   unityBehind: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   hudOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'transparent',
   },
   uiFull: {

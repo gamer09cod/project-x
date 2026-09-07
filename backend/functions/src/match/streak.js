@@ -19,6 +19,7 @@ const {
   floorStreakPayout,
   targetForLeg,
 } = require('./payout');
+const { gameTimerFromStartedAt } = require('./gameTimer');
 
 const GAME_ID = 'basketball_v1';
 
@@ -155,6 +156,7 @@ async function startLegMatch(client, streak, leg, joinIdempotencyKey) {
     matchPlayerId: player.rows[0].id,
     startedAt: new Date(player.rows[0].started_at).toISOString(),
     scoreDeadlineAt: new Date(player.rows[0].score_deadline_at).toISOString(),
+    ...gameTimerFromStartedAt(player.rows[0].started_at),
     targetScore: targetForLeg(leg, streak),
   };
 }
@@ -471,6 +473,9 @@ async function startStreakHandler(request) {
       expiresAt: expiresAt.toISOString(),
       startedAt: leg.startedAt,
       scoreDeadlineAt: leg.scoreDeadlineAt,
+      serverNowEpochMs: leg.serverNowEpochMs,
+      gameStartEpochMs: leg.gameStartEpochMs,
+      gameEndEpochMs: leg.gameEndEpochMs,
       walletBalanceCents: Number(ledger.balance_after_cents),
     };
   });
@@ -516,6 +521,7 @@ async function continueStreakHandler(request) {
       );
       const balance = await getBalance(client, user.id);
       const leg = Number(s.current_leg);
+      const timer = gameTimerFromStartedAt(mp.rows[0].started_at);
       return {
         streakId: s.id,
         pveMatchId: s.pve_match_id,
@@ -531,6 +537,9 @@ async function continueStreakHandler(request) {
         expiresAt: new Date(s.expires_at).toISOString(),
         startedAt: new Date(mp.rows[0].started_at).toISOString(),
         scoreDeadlineAt: new Date(mp.rows[0].score_deadline_at).toISOString(),
+        serverNowEpochMs: timer.serverNowEpochMs,
+        gameStartEpochMs: timer.gameStartEpochMs,
+        gameEndEpochMs: timer.gameEndEpochMs,
         walletBalanceCents: balance,
       };
     }
@@ -606,6 +615,9 @@ async function continueStreakHandler(request) {
       expiresAt: new Date(streak.expires_at).toISOString(),
       startedAt: leg.startedAt,
       scoreDeadlineAt: leg.scoreDeadlineAt,
+      serverNowEpochMs: leg.serverNowEpochMs,
+      gameStartEpochMs: leg.gameStartEpochMs,
+      gameEndEpochMs: leg.gameEndEpochMs,
       walletBalanceCents: balance,
     };
   });
@@ -1010,6 +1022,9 @@ async function serializeStreakSnapshot(client, streak, userId) {
   let matchPlayerId = null;
   let startedAt = null;
   let scoreDeadlineAt = null;
+  let serverNowEpochMs = null;
+  let gameStartEpochMs = null;
+  let gameEndEpochMs = null;
   if (streak.pve_match_id) {
     const mp = await client.query(
       `SELECT id, started_at, score_deadline_at, status
@@ -1025,6 +1040,12 @@ async function serializeStreakSnapshot(client, streak, userId) {
       scoreDeadlineAt = mp.rows[0].score_deadline_at
         ? new Date(mp.rows[0].score_deadline_at).toISOString()
         : null;
+      if (mp.rows[0].started_at) {
+        const timer = gameTimerFromStartedAt(mp.rows[0].started_at);
+        serverNowEpochMs = timer.serverNowEpochMs;
+        gameStartEpochMs = timer.gameStartEpochMs;
+        gameEndEpochMs = timer.gameEndEpochMs;
+      }
     }
   }
   const currentLeg = Number(streak.current_leg) || 1;
@@ -1055,6 +1076,9 @@ async function serializeStreakSnapshot(client, streak, userId) {
     matchPlayerId,
     startedAt,
     scoreDeadlineAt,
+    serverNowEpochMs,
+    gameStartEpochMs,
+    gameEndEpochMs,
     canContinue,
     canResumeRun,
     walletBalanceCents: balance,

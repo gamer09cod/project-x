@@ -2,7 +2,7 @@
  * Clock bounds for a single run. Locked in Step 3 (DECISIONS.md C1).
  * durationMs on a valid payload must be <= RUN + optional buzzer-beater + slack.
  */
-export const RUN_DURATION_MS = 15_000;
+export const RUN_DURATION_MS = 60_000;
 export const BUZZER_BEATER_BONUS_MS = 5_000;
 export const SCORE_DURATION_SLACK_MS = 2_000;
 export const MAX_DURATION_MS =

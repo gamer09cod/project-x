@@ -13,6 +13,14 @@ export type JoinMatchRequest = {
   idempotencyKey: Uuid;
 };
 
+/** Server-owned play clock. Client derives remaining; never trusts wall clock alone. */
+export type GameTimerEpochs = {
+  serverNowEpochMs: number;
+  gameStartEpochMs: number;
+  /** started_at + RUN_DURATION_MS (60s). Buzzer +5s is presentation-only until verify. */
+  gameEndEpochMs: number;
+};
+
 export type JoinMatchResponse = {
   matchId: Uuid;
   matchPlayerId: Uuid;
@@ -21,7 +29,9 @@ export type JoinMatchResponse = {
   matchStatus: Extract<MatchStatus, "live" | "paired">;
   stakeCents: Cents;
   startedAt: IsoTimestamp;
+  /** Submit/crash-scum window (started_at + 75s). Not the play clock. */
   scoreDeadlineAt: IsoTimestamp;
+} & GameTimerEpochs & {
   boostId: Uuid | null;
   /** Server snapshot of the boost applied at entry. Null when no boost. */
   boost: {

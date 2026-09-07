@@ -34,10 +34,14 @@ test('startRun + scorePayload bridge envelope', () => {
     stakeCents: 500 as never,
     opponentPostedScore: null,
     scoreDeadlineAt: '2026-09-04T00:00:00.000Z' as never,
+    serverNowEpochMs: 1_000_000,
+    gameStartEpochMs: 1_000_000,
+    gameEndEpochMs: 1_060_000,
   });
   expect(start.type).toBe('startRun');
   expect(start.gameId).toBe(GAME_ID_BASKETBALL_V1);
   expect(start.runDurationMs).toBe(RUN_DURATION_MS);
+  expect(start.gameEndEpochMs - start.gameStartEpochMs).toBe(RUN_DURATION_MS);
 
   const ready = parseUnityMessage(
     JSON.stringify({
