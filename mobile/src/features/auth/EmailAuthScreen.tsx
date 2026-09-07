@@ -89,7 +89,7 @@ export function EmailAuthScreen({onSignedIn}: Props): React.JSX.Element {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0b1420',
+    backgroundColor: '#000000',
     justifyContent: 'center',
     padding: 24,
     gap: 12,

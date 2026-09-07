@@ -8,25 +8,50 @@ import {
   View,
 } from 'react-native';
 import {signOut} from '@react-native-firebase/auth';
-import type {Cents, GetWalletResponse, Uuid} from '@project-x/shared';
-import {MOCK_DEPOSIT_MAX_CENTS} from '@project-x/shared';
+import type {
+  Cents,
+  GetWalletResponse,
+  JoinMatchResponse,
+  StartStreakResponse,
+  Uuid,
+} from '@project-x/shared';
+import {
+  GAME_ID_BASKETBALL_V1,
+  MOCK_DEPOSIT_MAX_CENTS,
+} from '@project-x/shared';
+import type {MatchRunParams} from '../match/MatchRunScreen';
 import {newIdempotencyKey} from '../../lib/idempotency';
-import {ensureProfile, getWallet, mockDeposit} from '../../services/callables';
+import {
+  ensureProfile,
+  getWallet,
+  joinMatch,
+  mockDeposit,
+  startStreak,
+} from '../../services/callables';
 import {appAuth} from '../../services/firebase';
+
+const DEBUG_STAKE_CENTS = 500 as Cents;
 
 type Props = {
   onOpenUnity: () => void;
+  onMatchJoined: (params: MatchRunParams) => void;
 };
 
 /**
- * Phase 4 debug wallet. Displays server balance/rating only — no client money math.
+ * Phase 4–8 debug wallet. Displays server balance/rating only — no client money math.
+ * Join Match / Start Streak debit then hand off to MatchRunScreen.
  */
-export function WalletDebugScreen({onOpenUnity}: Props): React.JSX.Element {
+export function WalletDebugScreen({
+  onOpenUnity,
+  onMatchJoined,
+}: Props): React.JSX.Element {
   const [wallet, setWallet] = useState<GetWalletResponse | null>(null);
   const [depositCents, setDepositCents] = useState('1000');
   const [status, setStatus] = useState('Loading profile…');
   const [busy, setBusy] = useState(false);
   const [depositKey, setDepositKey] = useState(() => newIdempotencyKey());
+  const [joinKey, setJoinKey] = useState(() => newIdempotencyKey());
+  const [streakKey, setStreakKey] = useState(() => newIdempotencyKey());
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -67,7 +92,6 @@ export function WalletDebugScreen({onOpenUnity}: Props): React.JSX.Element {
         rating: wallet?.rating ?? 1000,
       });
       setStatus(`Credited ${res.creditedCents}¢ · balance ${res.balanceCents}¢`);
-      // New key for the next distinct deposit tap.
       setDepositKey(newIdempotencyKey());
       const w = await getWallet();
       setWallet(w);
@@ -75,6 +99,62 @@ export function WalletDebugScreen({onOpenUnity}: Props): React.JSX.Element {
       const msg = e instanceof Error ? e.message : String(e);
       setStatus(`Deposit failed: ${msg}`);
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const onJoinMatch = async () => {
+    setBusy(true);
+    try {
+      const join: JoinMatchResponse = await joinMatch({
+        gameId: GAME_ID_BASKETBALL_V1,
+        stakeCents: DEBUG_STAKE_CENTS,
+        boostId: null,
+        idempotencyKey: joinKey as Uuid,
+      });
+      const clientRunId = newIdempotencyKey() as Uuid;
+      setJoinKey(newIdempotencyKey());
+      setStatus(
+        `Joined ${join.matchId.slice(0, 8)}… seat ${join.seat} · mounting Unity`,
+      );
+      onMatchJoined({
+        matchId: join.matchId,
+        seat: join.seat,
+        stakeCents: join.stakeCents,
+        scoreDeadlineAt: join.scoreDeadlineAt,
+        opponentPostedScore: join.opponentPostedScore,
+        clientRunId,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setStatus(`joinMatch failed: ${msg}`);
+      setBusy(false);
+    }
+  };
+
+  const onStartStreak = async () => {
+    setBusy(true);
+    try {
+      const streak: StartStreakResponse = await startStreak({
+        stakeCents: DEBUG_STAKE_CENTS,
+        idempotencyKey: streakKey as Uuid,
+      });
+      const clientRunId = newIdempotencyKey() as Uuid;
+      setStreakKey(newIdempotencyKey());
+      setStatus(
+        `Streak ${streak.streakId.slice(0, 8)}… leg ${streak.currentLeg}/${streak.legsTotal} target ${streak.targetScore} · mounting Unity`,
+      );
+      onMatchJoined({
+        matchId: streak.pveMatchId,
+        seat: 1,
+        stakeCents: streak.stakeCents,
+        scoreDeadlineAt: streak.scoreDeadlineAt,
+        opponentPostedScore: null,
+        clientRunId,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setStatus(`startStreak failed: ${msg}`);
       setBusy(false);
     }
   };
@@ -117,6 +197,24 @@ export function WalletDebugScreen({onOpenUnity}: Props): React.JSX.Element {
         </Pressable>
         <Pressable style={styles.button} onPress={onDeposit} disabled={busy}>
           <Text style={styles.buttonLabel}>Deposit</Text>
+        </Pressable>
+      </View>
+      <View style={styles.row}>
+        <Pressable
+          style={[styles.button, styles.primary]}
+          onPress={onJoinMatch}
+          disabled={busy}>
+          <Text style={styles.buttonLabel}>
+            Join match ({DEBUG_STAKE_CENTS}¢)
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.button, styles.streak]}
+          onPress={onStartStreak}
+          disabled={busy}>
+          <Text style={styles.buttonLabel}>
+            Start streak ({DEBUG_STAKE_CENTS}¢)
+          </Text>
         </Pressable>
       </View>
       <View style={styles.row}>
@@ -190,6 +288,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  primary: {
+    backgroundColor: '#1a9f5c',
+  },
+  streak: {
+    backgroundColor: '#c47a1a',
   },
   secondary: {
     backgroundColor: '#243447',
