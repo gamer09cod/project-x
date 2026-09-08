@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8f3a1b24d5e6f708192a3b4c5d6e7f8, type: 3}
+  m_Name: BasketballGameplayConfig
+  m_EditorClassIdentifier: ProjectX.ArcadeBasketball.BasketballGameplayConfig
+  tapVelocity: 6
+  tapCooldown: 0.075
+  maxUpwardVelocity: 6
+  horizontalSpeed: 2
+  horizontalArriveDistance: 1.25
+  horizontalAcceleration: 20
+  gravityMultiplier: 1.75
+  maxFallSpeed: 14
+  groundBounciness: 0.62
+  maxBounceSpeed: 8.5
+  groundRestSpeed: 3.5
+  groundDrag: 1
+  collisionSteeringMultiplier: 0.25
+  collisionSteeringDuration: 0.12
+  minimumCollisionSpeedForSuppression: 0.5
+  outOfBoundsY: -6.5
+  outOfBoundsX: 6
+  ballRecoveryDelay: 0.25
+  spinMultiplier: 1
+  shadowMinScale: 0.45
+  shadowMaxAlpha: 0.5
+  shadowMinAlpha: 0.12
+  shadowFadeHeight: 3.5
+  pointsPerfect: 3
+  pointsRim: 2
+  pointsBackboard: 1

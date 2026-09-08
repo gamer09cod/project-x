@@ -32,4 +32,18 @@ public class Scenery : MonoBehaviour
 
         background.sprite = backgroundScreenshot.sprite = Resources.Load<Sprite>($"Scenery/background-{season}{night}");
     }
+
+    /// <summary>
+    /// Ranked embed: urban night court. Arcade/editor keep seasonal outdoor.
+    /// </summary>
+    public void ApplyEmbedLook()
+    {
+        Sprite urban = Resources.Load<Sprite>("Scenery/background-urban-night");
+        if (urban == null)
+            return;
+        if (background != null)
+            background.sprite = urban;
+        if (backgroundScreenshot != null)
+            backgroundScreenshot.sprite = urban;
+    }
 }

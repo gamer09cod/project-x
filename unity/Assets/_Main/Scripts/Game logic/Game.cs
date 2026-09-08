@@ -103,6 +103,33 @@ public class Game : MonoBehaviour
         if (embedMatchMode && shotClock != null && shotClock.started && !paused
             && !shotClock.frozen && !shotClock.isBuzzerBeater)
             _embedElapsed += Time.unscaledDeltaTime;
+
+        TickEmbedHoopDifficulty();
+    }
+
+    /// <summary>
+    /// Ranked hoop speed: early slow, late faster. Arcade still uses stage 2.
+    /// Remaining is server-derived; this only retunes presentation speed.
+    /// </summary>
+    void TickEmbedHoopDifficulty()
+    {
+        if (!embedMatchMode || hoop == null || !hoop.moving)
+            return;
+        if (shotClock == null || !shotClock.started || paused || shotClock.frozen)
+            return;
+
+        float u = 1f - Mathf.Clamp01(shotClock.remaining / 60f);
+        float speed;
+        if (u < 0.25f)
+            speed = Mathf.Lerp(0.28f, 0.36f, u / 0.25f);
+        else if (u < 0.55f)
+            speed = Mathf.Lerp(0.36f, 0.46f, (u - 0.25f) / 0.30f);
+        else if (u < 0.85f)
+            speed = Mathf.Lerp(0.46f, 0.55f, (u - 0.55f) / 0.30f);
+        else
+            speed = Mathf.Lerp(0.55f, 0.64f, (u - 0.85f) / 0.15f);
+
+        hoop.SetCruiseSpeed(speed);
     }
 
     public void UpdateGame()
@@ -188,6 +215,8 @@ public class Game : MonoBehaviour
         ui?.UpdateScores(true);
         ui?.UpdateClock();
         GameAudio.Instance?.SetGameplayActive(true);
+        FindFirstObjectByType<Scenery>()?.ApplyEmbedLook();
+        hoop?.Move();
         ProjectX.Effect.EffectEvents.RaiseRunStarted();
     }
 
@@ -299,7 +328,8 @@ public class Game : MonoBehaviour
         }
         else if (stage == 2)
         {
-            hoop.IncreaseSpeed(0.035f);
+            if (!embedMatchMode)
+                hoop.IncreaseSpeed(0.035f);
         }
     }
 

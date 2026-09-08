@@ -87,6 +87,13 @@ public class Hoop : MonoBehaviour
 
     public void UpdateHoop()
     {
+        if (Game.Instance != null && Game.Instance.embedMatchMode)
+        {
+            if (!moving)
+                Move();
+            return;
+        }
+
         if (moving && Game.Instance.stage < 2)
         {
             moving = false;
@@ -173,6 +180,16 @@ public class Hoop : MonoBehaviour
         // rb.linearVelocity here would be dead when moving and would nudge a
         // stationary hoop when not.
         _speed = Mathf.Max(0f, _speed + v);
+    }
+
+    /// <summary>
+    /// Ranked difficulty: set cruise speed without restarting the patrol.
+    /// </summary>
+    public void SetCruiseSpeed(float speed)
+    {
+        if (!moving)
+            return;
+        _speed = Mathf.Max(MOVING_SPEED * 0.7f, speed);
     }
 
     private void Start()
