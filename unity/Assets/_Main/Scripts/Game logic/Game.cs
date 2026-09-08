@@ -81,8 +81,10 @@ public class Game : MonoBehaviour
         if (Progress.Instance != null && Progress.Instance.currentBallSkin != null)
             ball.SetSkin(Progress.Instance.currentBallSkin);
         ui.UpdateScores(true);
-        // Ranked embed waits for RN startRun. Arcade / editor: clock runs from launch.
-        if (!embedMatchMode)
+        // Mobile embed always has RnBridge and waits for RN startRun / BeginEmbedMatch.
+        // Starting arcade here would play BGM (and the clock) before the ranked run,
+        // so the user hears music twice when startRun enables audio again.
+        if (!embedMatchMode && !Application.isMobilePlatform)
             StartArcadeClock();
     }
 
@@ -154,7 +156,10 @@ public class Game : MonoBehaviour
         shotClock?.SetInFlight(false);
         if (authTimer != null)
             authTimer.Clear();
-        Resume();
+        // Unpause the simulation only — do not touch GameAudio here.
+        // CancelEmbedMatch will Pause (mute); BeginEmbedMatch enables BGM once.
+        paused = false;
+        Time.timeScale = 1f;
         ui?.UpdateScores(true);
         ui?.UpdateClock();
     }

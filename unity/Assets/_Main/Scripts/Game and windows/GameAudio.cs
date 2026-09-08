@@ -215,13 +215,15 @@ public class GameAudio : MonoBehaviour
     {
         if (!_gameplayActive || !bgMusic || !musicSource)
             return;
+        if (musicSource.clip == bgMusic && musicSource.isPlaying)
+            return;
         if (musicSource.clip == bgMusic && musicSource.time > 0f && !musicSource.isPlaying)
         {
             musicSource.UnPause();
             return;
         }
-        if (musicSource.isPlaying && musicSource.clip == bgMusic)
-            return;
+        // Hard restart — stop first so a stale Play cannot layer with a new one.
+        musicSource.Stop();
         musicSource.clip = bgMusic;
         musicSource.loop = true;
         musicSource.volume = 0.28f;
