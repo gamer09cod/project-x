@@ -22,7 +22,9 @@ export type GlyphName =
   | 'lock'
   | 'play'
   | 'userPlus'
-  | 'check';
+  | 'check'
+  | 'headset'
+  | 'mail';
 
 const GLYPH: Record<GlyphName, string> = {
   trophy: '🏆',
@@ -46,6 +48,8 @@ const GLYPH: Record<GlyphName, string> = {
   play: '▶',
   userPlus: '+',
   check: '✓',
+  headset: '🎧',
+  mail: '✉',
 };
 
 type Props = {

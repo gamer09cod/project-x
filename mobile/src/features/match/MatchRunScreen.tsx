@@ -21,9 +21,11 @@ import {
   postPing,
   postStartRun,
 } from '../../bridge/run';
+import {SHOW_RUN_DEBUG_HUD} from '../../lib/debugFlags';
 import {newIdempotencyKey} from '../../lib/idempotency';
 import {abandonStreak, submitScore} from '../../services/callables';
 import {mapCallableError} from '../../lib/callableErrors';
+import {colors} from '../../theme';
 
 /** Minimal run session — works for joinMatch or startStreak PvE. */
 export type MatchRunParams = {
@@ -71,7 +73,7 @@ export function MatchRunScreen({
   onFinished,
   onCancel,
 }: Props): React.JSX.Element {
-  const {unityRef, setMessageHandler, pause} = useUnityPlayer();
+  const {unityRef, setMessageHandler, pause, hideForHandoff} = useUnityPlayer();
   const submitKeyRef = useRef(newIdempotencyKey());
   const runReadyRef = useRef(false);
   const bridgeUpRef = useRef(false);
@@ -82,6 +84,7 @@ export function MatchRunScreen({
   const [status, setStatus] = useState('Waiting for Unity…');
   const [busy, setBusy] = useState(false);
   const [runComplete, setRunComplete] = useState(false);
+  const [runLive, setRunLive] = useState(false);
   const [pendingScore, setPendingScore] = useState<number | null>(null);
 
   const abortUnity = useCallback(() => {
@@ -127,6 +130,7 @@ export function MatchRunScreen({
     submittingRef.current = false;
     runCompleteRef.current = false;
     setRunComplete(false);
+    setRunLive(false);
     setPendingScore(null);
     setBusy(false);
     setStatus('Waiting for Unity…');
@@ -154,6 +158,7 @@ export function MatchRunScreen({
           return;
         }
         runReadyRef.current = true;
+        setRunLive(true);
         setStatus('Run ready · play until the clock ends');
         return;
       }
@@ -169,6 +174,9 @@ export function MatchRunScreen({
           submittingRef.current = true;
           runCompleteRef.current = true;
           pause();
+          // Park Unity behind opaque RN — Android SurfaceView draws above
+          // siblings, so a transparent/partial overlay left a blank bottom strip.
+          hideForHandoff();
           setRunComplete(true);
           setPendingScore(msg.payload.score);
           setBusy(true);
@@ -200,6 +208,7 @@ export function MatchRunScreen({
     };
   }, [
     abortUnity,
+    hideForHandoff,
     onFinished,
     params.clientRunId,
     params.matchId,
@@ -261,49 +270,67 @@ export function MatchRunScreen({
     return () => clearInterval(interval);
   }, [params, runComplete, unityRef]);
 
+  const leaveLabel = params.streakId
+    ? 'Quit streak (no refund)'
+    : 'Leave (server may zero)';
+
+  const leaveButton =
+    !runLive ? (
+      <Pressable
+        style={styles.back}
+        onPress={() => {
+          void leave();
+        }}
+        disabled={busy}>
+        <Text style={styles.buttonLabel}>{leaveLabel}</Text>
+      </Pressable>
+    ) : null;
+
+  let runChrome: React.ReactNode = null;
+  if (!runComplete && SHOW_RUN_DEBUG_HUD) {
+    runChrome = (
+      <View style={styles.hud} pointerEvents="box-none">
+        <Text style={styles.hudTitle}>
+          {params.streakId
+            ? `Streak · game ${params.currentLeg ?? 1}/3`
+            : 'Match run'}
+        </Text>
+        {params.targetScore != null ? (
+          <Text style={styles.hudLine}>Beat {params.targetScore}</Text>
+        ) : null}
+        <Text style={styles.hudLine}>
+          seat {params.seat} · stake {params.stakeCents}¢ · match{' '}
+          {params.matchId.slice(0, 8)}…
+        </Text>
+        {params.opponentPostedScore != null ? (
+          <Text style={styles.hudLine}>
+            Opponent posted: {params.opponentPostedScore}
+          </Text>
+        ) : null}
+        <Text style={styles.hudLine}>{status}</Text>
+        {/*
+          Debug only. Release builds have no RN Leave — quit is in-game
+          and submits the current score instead of forfeiting.
+        */}
+        {leaveButton ?? (
+          <Text style={styles.hudLine}>
+            Quitting is handled in-game — your score would count as final.
+          </Text>
+        )}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root} pointerEvents="box-none">
-      {!runComplete ? (
-        <View style={styles.hud} pointerEvents="box-none">
-          <Text style={styles.hudTitle}>
-            {params.streakId
-              ? `Streak · game ${params.currentLeg ?? 1}/3`
-              : 'Match run'}
-          </Text>
-          {params.targetScore != null ? (
-            <Text style={styles.hudLine}>Beat {params.targetScore}</Text>
-          ) : null}
-          <Text style={styles.hudLine}>
-            seat {params.seat} · stake {params.stakeCents}¢ · match{' '}
-            {params.matchId.slice(0, 8)}…
-          </Text>
-          {params.opponentPostedScore != null ? (
-            <Text style={styles.hudLine}>
-              Opponent posted: {params.opponentPostedScore}
-            </Text>
-          ) : null}
-          <Text style={styles.hudLine}>{status}</Text>
-          <Pressable
-            style={styles.back}
-            onPress={() => {
-              void leave();
-            }}
-            disabled={busy}>
-            <Text style={styles.buttonLabel}>
-              {params.streakId
-                ? 'Quit streak (no refund)'
-                : 'Leave (server may zero)'}
-            </Text>
-          </Pressable>
-        </View>
-      ) : (
+      {runComplete ? (
         <View style={styles.handoffOverlay}>
           <Text style={styles.handoffTitle}>Run complete</Text>
           {pendingScore != null ? (
             <Text style={styles.handoffLine}>Claimed score {pendingScore}</Text>
           ) : null}
           <Text style={styles.handoffLine}>{status}</Text>
-          {busy ? <ActivityIndicator color="#9ec5ff" /> : null}
+          {busy ? <ActivityIndicator color={colors.cash} /> : null}
           {!busy ? (
             <Pressable
               style={styles.back}
@@ -314,6 +341,8 @@ export function MatchRunScreen({
             </Pressable>
           ) : null}
         </View>
+      ) : (
+        runChrome
       )}
     </View>
   );
@@ -325,20 +354,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   handoffOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: '#0b1420',
+    flex: 1,
+    backgroundColor: colors.bg,
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 24,
     gap: 10,
   },
   handoffTitle: {
-    color: '#f4f7fb',
+    color: colors.textPrimary,
     fontSize: 24,
     fontWeight: '700',
+    textAlign: 'center',
   },
   handoffLine: {
-    color: '#c5d0dc',
+    color: colors.textMuted,
     fontSize: 16,
+    textAlign: 'center',
   },
   hud: {
     position: 'absolute',
@@ -348,24 +380,24 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   hudTitle: {
-    color: '#f4f7fb',
+    color: colors.textPrimary,
     fontSize: 18,
     fontWeight: '600',
   },
   hudLine: {
-    color: '#c5d0dc',
+    color: colors.textMuted,
     fontSize: 13,
   },
   back: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#243447',
+    alignSelf: 'center',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginTop: 4,
   },
   buttonLabel: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontWeight: '600',
   },
 });

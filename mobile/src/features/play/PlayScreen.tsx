@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {
+  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +17,8 @@ import {formatCentsDisplay} from '../../lib/formatMoney';
 import {stakeAt} from '../../lib/stakes';
 
 export type PlayMode = 'free' | 'pvp_1v1' | 'blitz' | 'streak';
+
+const GAME_BANNER = require('./assets/game-banner.jpg');
 
 type Props = {
   boostActive: boolean;
@@ -57,18 +60,16 @@ export function PlayScreen({
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
+        <ImageBackground
+          source={GAME_BANNER}
+          style={styles.hero}
+          resizeMode="cover">
           <View style={styles.heroNav}>
-            <View style={styles.heroBtn}>
-              <Glyph name="back" size={22} color={colors.textPrimary} />
-            </View>
             <Pressable style={styles.heroBtn} onPress={() => setInfoOpen(true)}>
               <Glyph name="help" size={18} color={colors.textPrimary} />
             </Pressable>
           </View>
-          <Text style={styles.heroTitle}>BASKETBALL</Text>
-          <Text style={styles.heroSub}>basketball_v1</Text>
-        </View>
+        </ImageBackground>
 
         <ScrollView
           horizontal
@@ -383,10 +384,8 @@ const styles = StyleSheet.create({
   scroll: {paddingBottom: 16},
   hero: {
     height: 220,
-    justifyContent: 'flex-end',
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    backgroundColor: '#1E3A5F',
+    backgroundColor: '#0A1220',
+    overflow: 'hidden',
   },
   heroNav: {
     position: 'absolute',
@@ -394,7 +393,8 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
+    zIndex: 1,
   },
   heroBtn: {
     width: 36,
@@ -404,13 +404,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroTitle: {
-    color: colors.textPrimary,
-    fontSize: 36,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  heroSub: {color: colors.textMuted, fontSize: 12, marginTop: 4},
   modes: {paddingHorizontal: 16, paddingVertical: 14, gap: 8},
   chip: {
     flexDirection: 'row',

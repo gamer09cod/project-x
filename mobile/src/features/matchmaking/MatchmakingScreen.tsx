@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 import type {
   Cents,
   JoinMatchResponse,
@@ -10,6 +10,14 @@ import type {
 import {GAME_ID_BASKETBALL_V1} from '@project-x/shared';
 import {colors, radii} from '../../theme';
 import {FaceoffAvatars} from '../../components/FaceoffAvatars';
+import {Glyph} from '../../components/Glyph';
+import {
+  FadeSlideIn,
+  LoadingDots,
+  PressableScale,
+  Pulse,
+  Shake,
+} from '../../components/motion';
 import {formatCentsDisplay} from '../../lib/formatMoney';
 import {mapCallableError} from '../../lib/callableErrors';
 import {joinMatch, startStreak} from '../../services/callables';
@@ -22,6 +30,8 @@ type Props = {
   idempotencyKey: string;
   boostPreview: boolean;
   boostId: string | null;
+  /** From ensureProfile — shown on the faceoff left slot. */
+  displayName?: string | null;
   onFailedBack: () => void;
   onJoined: (
     params: MatchRunParams,
@@ -32,12 +42,19 @@ type Props = {
 
 type Phase = 'searching' | 'starting' | 'failed';
 
+function formatElapsed(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export function MatchmakingScreen({
   mode,
   stakeCents,
   idempotencyKey,
   boostPreview,
   boostId,
+  displayName,
   onFailedBack,
   onJoined,
 }: Props): React.JSX.Element {
@@ -45,8 +62,10 @@ export function MatchmakingScreen({
     mode === 'streak' ? 'starting' : 'searching',
   );
   const [error, setError] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const keyRef = useRef(idempotencyKey);
   const inFlight = useRef(false);
+  const startedAt = useRef(Date.now());
 
   const run = useCallback(async () => {
     if (inFlight.current) {
@@ -54,6 +73,8 @@ export function MatchmakingScreen({
     }
     inFlight.current = true;
     setError(null);
+    startedAt.current = Date.now();
+    setElapsed(0);
     setPhase(mode === 'streak' ? 'starting' : 'searching');
     try {
       if (mode === 'streak') {
@@ -115,73 +136,144 @@ export function MatchmakingScreen({
     run();
   }, [run]);
 
-  const status =
-    phase === 'failed'
-      ? error ?? 'Request failed'
-      : mode === 'streak'
-        ? 'Starting streak…'
-        : 'Finding a player…';
+  // Display only. The real deadline is server-owned; this just makes a wait
+  // feel bounded instead of hung.
+  useEffect(() => {
+    if (phase === 'failed') {
+      return;
+    }
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt.current) / 1000));
+    }, 500);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  const failed = phase === 'failed';
+  const status = failed
+    ? error ?? 'Request failed'
+    : mode === 'streak'
+      ? 'Starting streak'
+      : 'Finding a player';
+
+  const youLabel =
+    displayName && displayName.trim().length > 0
+      ? displayName.trim()
+      : 'You';
 
   return (
     <View style={styles.root}>
-      <View style={styles.hero} />
-      <View style={styles.body}>
-        <FaceoffAvatars
-          left={{name: 'You'}}
-          right={
-            mode === 'streak'
-              ? {name: 'PvE', locked: true}
-              : {name: 'Opponent', searching: phase !== 'failed'}
-          }
-        />
-        <Text style={styles.status}>{status}</Text>
-        <View style={styles.meta}>
-          <Text style={styles.metaText}>
-            {mode === 'streak' ? 'Streak' : '1v1'} ·{' '}
-            {formatCentsDisplay(stakeCents)}
+      <Shake trigger={failed} style={styles.body}>
+        <FadeSlideIn delay={0}>
+          <FaceoffAvatars
+            left={{name: youLabel}}
+            right={
+              mode === 'streak'
+                ? {name: 'PvE', locked: true}
+                : {name: 'Opponent', searching: !failed}
+            }
+            center={
+              <Pulse active={!failed} max={1.08}>
+                <View style={[styles.vs, failed ? styles.vsFailed : null]}>
+                  <Text style={styles.vsText}>VS</Text>
+                </View>
+              </Pulse>
+            }
+          />
+        </FadeSlideIn>
+
+        <FadeSlideIn delay={80} style={styles.statusRow}>
+          <Text style={[styles.status, failed ? styles.statusFailed : null]}>
+            {status}
           </Text>
-        </View>
-        {boostPreview && mode === 'pvp_1v1' ? (
-          <View style={styles.boostPill}>
-            <Text style={styles.boostPillText}>BOOST SELECTED</Text>
+          {!failed ? <LoadingDots color={colors.textPrimary} /> : null}
+        </FadeSlideIn>
+
+        <FadeSlideIn delay={140} style={styles.pills}>
+          <View style={styles.meta}>
+            <Text style={styles.metaText}>
+              {mode === 'streak' ? 'Streak' : '1v1'} ·{' '}
+              {formatCentsDisplay(stakeCents)}
+            </Text>
           </View>
+          {boostPreview && mode === 'pvp_1v1' ? (
+            <View style={styles.boostPill}>
+              <Glyph name="zap" size={11} color={colors.cash} />
+              <Text style={styles.boostPillText}>BOOST</Text>
+            </View>
+          ) : null}
+        </FadeSlideIn>
+
+        {!failed ? (
+          <FadeSlideIn delay={200}>
+            <Text style={styles.elapsed}>
+              Searching · {formatElapsed(elapsed)}
+            </Text>
+          </FadeSlideIn>
         ) : null}
-        {phase !== 'failed' ? (
-          <ActivityIndicator color={colors.cash} style={styles.spin} />
-        ) : null}
-        <Text style={styles.note}>Entry is charged when a match starts.</Text>
-        {phase === 'failed' ? (
-          <View style={styles.actions}>
-            <Pressable style={styles.retry} onPress={() => { run(); }}>
+
+        <FadeSlideIn delay={260}>
+          <Text style={styles.note}>Entry is charged when a match starts.</Text>
+        </FadeSlideIn>
+
+        {failed ? (
+          <FadeSlideIn delay={60} style={styles.actions}>
+            <PressableScale
+              style={styles.retry}
+              onPress={() => {
+                run();
+              }}>
               <Text style={styles.retryLabel}>Try again</Text>
-            </Pressable>
-            <Pressable onPress={onFailedBack}>
+            </PressableScale>
+            <PressableScale onPress={onFailedBack} style={styles.backHit}>
               <Text style={styles.back}>Back to Play</Text>
-            </Pressable>
-          </View>
+            </PressableScale>
+          </FadeSlideIn>
         ) : null}
-      </View>
+      </Shake>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: colors.bg},
-  hero: {height: 140, backgroundColor: '#1E3A5F'},
   body: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: 24,
     gap: 12,
+  },
+  vs: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vsFailed: {borderColor: colors.fail},
+  vsText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 20,
   },
   status: {
     color: colors.textPrimary,
     fontSize: 22,
     fontWeight: '800',
     textAlign: 'center',
-    marginTop: 16,
   },
+  statusFailed: {color: colors.fail, fontSize: 17},
+  pills: {flexDirection: 'row', alignItems: 'center', gap: 8},
   meta: {
     backgroundColor: colors.surface,
     borderRadius: radii.pill,
@@ -190,16 +282,24 @@ const styles = StyleSheet.create({
   },
   metaText: {color: colors.textMuted, fontWeight: '600'},
   boostPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     borderWidth: 1,
     borderColor: colors.cash,
     borderRadius: radii.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  boostPillText: {color: colors.cash, fontWeight: '800', fontSize: 12},
-  spin: {marginTop: 8},
-  note: {color: colors.textTertiary, fontSize: 12, marginTop: 8},
-  actions: {alignItems: 'center', gap: 12, marginTop: 16},
+  boostPillText: {color: colors.cash, fontWeight: '800', fontSize: 11},
+  elapsed: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  note: {color: colors.textTertiary, fontSize: 12},
+  actions: {alignItems: 'center', gap: 8, marginTop: 12},
   retry: {
     backgroundColor: colors.cta,
     borderRadius: radii.pill,
@@ -207,5 +307,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   retryLabel: {color: colors.textPrimary, fontWeight: '800', fontSize: 16},
+  backHit: {paddingVertical: 10, paddingHorizontal: 16},
   back: {color: colors.textMuted, fontWeight: '600'},
 });

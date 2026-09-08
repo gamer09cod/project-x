@@ -5,11 +5,13 @@ import React, {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
   type RefObject,
 } from 'react';
 import {AppState, Platform, StyleSheet, View} from 'react-native';
 import UnityView from '@azesmway/react-native-unity';
+import {colors} from '../../theme';
 
 type MessageHandler = (raw: string) => void;
 
@@ -17,6 +19,11 @@ type UnityPlayerContextValue = {
   unityRef: RefObject<UnityView | null>;
   setMessageHandler: (handler: MessageHandler | null) => void;
   pause: () => void;
+  /**
+   * Cover Unity with opaque RN chrome (post-score handoff).
+   * Android SurfaceView draws above RN siblings — overlays alone leave a blank strip.
+   */
+  hideForHandoff: () => void;
 };
 
 const UnityPlayerContext = createContext<UnityPlayerContextValue | null>(null);
@@ -40,8 +47,17 @@ export function UnityPlayerHost({
 }: Props): React.JSX.Element {
   const unityRef = useRef<UnityView>(null);
   const handlerRef = useRef<MessageHandler | null>(null);
-  const visibleRef = useRef(visible);
-  visibleRef.current = visible;
+  const [handoffCover, setHandoffCover] = useState(false);
+  const effectiveVisible = visible && !handoffCover;
+  const visibleRef = useRef(effectiveVisible);
+  visibleRef.current = effectiveVisible;
+
+  // New run (visible true again) clears post-score cover.
+  useEffect(() => {
+    if (visible) {
+      setHandoffCover(false);
+    }
+  }, [visible]);
 
   const setMessageHandler = useCallback((handler: MessageHandler | null) => {
     handlerRef.current = handler;
@@ -63,6 +79,11 @@ export function UnityPlayerHost({
   }, []);
 
   const pause = useCallback(() => {
+    setPaused(true);
+  }, [setPaused]);
+
+  const hideForHandoff = useCallback(() => {
+    setHandoffCover(true);
     setPaused(true);
   }, [setPaused]);
 
@@ -107,11 +128,11 @@ export function UnityPlayerHost({
       sub.remove();
       setPaused(true);
     };
-  }, [sessionActive, visible, setPaused]);
+  }, [sessionActive, effectiveVisible, setPaused]);
 
   const value = useMemo(
-    () => ({unityRef, setMessageHandler, pause}),
-    [setMessageHandler, pause],
+    () => ({unityRef, setMessageHandler, pause, hideForHandoff}),
+    [setMessageHandler, pause, hideForHandoff],
   );
 
   return (
@@ -120,7 +141,7 @@ export function UnityPlayerHost({
         {sessionActive ? (
           <UnityView
             ref={unityRef}
-            style={visible ? styles.unityFlex : styles.unityBehind}
+            style={effectiveVisible ? styles.unityFlex : styles.unityBehind}
             androidKeepPlayerMounted
             onUnityMessage={event => {
               handlerRef.current?.(event.nativeEvent.message);
@@ -128,8 +149,8 @@ export function UnityPlayerHost({
           />
         ) : null}
         <View
-          style={visible ? styles.hudOverlay : styles.uiFull}
-          pointerEvents={visible ? 'box-none' : 'auto'}
+          style={effectiveVisible ? styles.hudOverlay : styles.uiFull}
+          pointerEvents={effectiveVisible ? 'box-none' : 'auto'}
           collapsable={false}>
           {children}
         </View>
@@ -149,7 +170,7 @@ export function useUnityPlayer(): UnityPlayerContextValue {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: colors.bg,
   },
   /** Match working MatchRunScreen: Unity fills layout height. */
   unityFlex: {
@@ -165,5 +186,6 @@ const styles = StyleSheet.create({
   },
   uiFull: {
     flex: 1,
+    backgroundColor: colors.bg,
   },
 });

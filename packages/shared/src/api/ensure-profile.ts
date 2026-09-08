@@ -13,9 +13,11 @@ export type EnsureProfileRequest = {
 export type EnsureProfileResponse = {
   userId: Uuid;
   firebaseUid: string;
+  /** Server-assigned gamer tag when the client/token omit a name. */
   displayName: string | null;
   status: UserStatus;
   rating: number;
+  /** Includes $10 welcome ADMIN_CREDIT on first provision. */
   walletBalanceCents: Cents;
 };
 

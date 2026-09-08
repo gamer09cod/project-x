@@ -17,6 +17,9 @@ GoogleService-Info.plist
 mobile/android/.gradle/
 mobile/android/app/build/
 mobile/android/build/
+mobile/android/keystore.properties
+mobile/android/app/release.keystore
+mobile/android/app/*.jks
 mobile/ios/Pods/
 mobile/ios/build/
 mobile/*.jsbundle

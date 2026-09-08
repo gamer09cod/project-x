@@ -2,38 +2,91 @@
 
 const { requireAuth, fail } = require('./auth');
 const { query, transaction } = require('./db');
+const {
+  WELCOME_CREDIT_CENTS,
+  randomDisplayName,
+  welcomeCreditIdempotencyKey,
+} = require('./displayNames');
 
 /**
  * Upsert users by firebase_uid. Wallet row is created by the INSERT trigger.
+ * First insert: random display name (if unset) + $10 ADMIN_CREDIT welcome.
  * @param {import('firebase-functions/https').CallableRequest} request
  */
 async function ensureProfileHandler(request) {
   const { uid, token } = requireAuth(request);
   const data = request.data && typeof request.data === 'object' ? request.data : {};
   const fromClient =
-    typeof data.displayName === 'string' ? data.displayName.trim() : null;
+    typeof data.displayName === 'string' && data.displayName.trim()
+      ? data.displayName.trim()
+      : null;
   const fromToken =
     typeof token.name === 'string' && token.name.trim()
       ? token.name.trim()
       : null;
-  const displayName = fromClient || fromToken || null;
 
   return transaction(async (client) => {
-    const upsert = await client.query(
+    const initialName = fromClient || fromToken || randomDisplayName();
+
+    const insert = await client.query(
       `INSERT INTO users (firebase_uid, display_name)
        VALUES ($1, $2)
-       ON CONFLICT (firebase_uid) DO UPDATE
-         SET display_name = COALESCE(EXCLUDED.display_name, users.display_name),
-             updated_at = now()
+       ON CONFLICT (firebase_uid) DO NOTHING
        RETURNING id, firebase_uid, display_name, status, rating`,
-      [uid, displayName],
+      [uid, initialName],
     );
-    const user = upsert.rows[0];
+
+    let user = insert.rows[0] || null;
+    const isNew = Boolean(user);
+
     if (!user) {
-      fail('invalid_argument', 'profile_upsert_failed', 'internal');
+      const existing = await client.query(
+        `SELECT id, firebase_uid, display_name, status, rating
+         FROM users
+         WHERE firebase_uid = $1
+         FOR UPDATE`,
+        [uid],
+      );
+      user = existing.rows[0];
+      if (!user) {
+        fail('invalid_argument', 'profile_upsert_failed', 'internal');
+      }
+
+      // Prefer explicit client rename; otherwise backfill a missing name once.
+      const nextName =
+        fromClient ||
+        (!user.display_name ? fromToken || randomDisplayName() : null);
+      if (nextName && nextName !== user.display_name) {
+        const updated = await client.query(
+          `UPDATE users
+           SET display_name = $2, updated_at = now()
+           WHERE id = $1
+           RETURNING id, firebase_uid, display_name, status, rating`,
+          [user.id, nextName],
+        );
+        user = updated.rows[0];
+      }
     }
+
     if (user.status === 'suspended' || user.status === 'banned') {
       fail('user_suspended', 'Account is not active', 'permission-denied');
+    }
+
+    if (isNew) {
+      const key = welcomeCreditIdempotencyKey(user.id);
+      await client.query(
+        `SELECT id FROM apply_ledger_entry(
+           $1::uuid,
+           'ADMIN_CREDIT'::ledger_entry_type,
+           $2::bigint,
+           $3::uuid,
+           $3::uuid,
+           NULL::uuid,
+           NULL::uuid,
+           NULL::uuid
+         )`,
+        [user.id, WELCOME_CREDIT_CENTS, key],
+      );
     }
 
     const wallet = await client.query(
@@ -84,4 +137,8 @@ async function getWalletHandler(request) {
   };
 }
 
-module.exports = { ensureProfileHandler, getWalletHandler };
+module.exports = {
+  ensureProfileHandler,
+  getWalletHandler,
+  WELCOME_CREDIT_CENTS,
+};

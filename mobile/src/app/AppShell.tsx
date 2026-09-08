@@ -58,6 +58,7 @@ export function AppShell(): React.JSX.Element {
   const unitySessionRef = useRef(false);
   const [balanceCents, setBalanceCents] = useState<number | null>(null);
   const [rating, setRating] = useState<number | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [activatedBoostId, setActivatedBoostId] = useState<string | null>(null);
   const [boostInventoryCount, setBoostInventoryCount] = useState(0);
   const [results, setResults] = useState<ResultEntry[]>([]);
@@ -82,6 +83,9 @@ export function AppShell(): React.JSX.Element {
       const p = await ensureProfile({});
       setBalanceCents(p.walletBalanceCents);
       setRating(p.rating);
+      if (p.displayName) {
+        setDisplayName(p.displayName);
+      }
     } catch {
       // Profile tab still shows the detailed error.
     }
@@ -208,6 +212,7 @@ export function AppShell(): React.JSX.Element {
           boostId={
             overlay.mode === 'pvp_1v1' ? (activatedBoostId as Uuid | null) : null
           }
+          displayName={displayName}
           onFailedBack={() => setOverlay({name: 'none'})}
           onJoined={(
             params,
@@ -360,9 +365,13 @@ export function AppShell(): React.JSX.Element {
             <ProfileScreen
               initialBalanceCents={balanceCents}
               initialRating={rating}
-              onWalletChange={(cents, nextRating) => {
+              initialDisplayName={displayName}
+              onWalletChange={(cents, nextRating, nextDisplayName) => {
                 setBalanceCents(cents);
                 setRating(nextRating);
+                if (nextDisplayName) {
+                  setDisplayName(nextDisplayName);
+                }
               }}
             />
           ) : null}
