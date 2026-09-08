@@ -63,6 +63,14 @@ namespace ProjectX.Effect
                 min = Vector2.zero;
                 max = Vector2.one;
             }
+
+            // Embedded Unity often reports no cutout. Keep a minimum top band on
+            // mobile so feedback / overlays stay below the status bar.
+            if (Application.isMobilePlatform && min.y <= 0.001f && max.y >= 0.999f)
+            {
+                float topFrac = Mathf.Clamp(72f / h, 0.02f, 0.12f);
+                max.y = 1f - topFrac;
+            }
         }
 
         void Apply(bool force)

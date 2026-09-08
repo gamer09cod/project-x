@@ -77,7 +77,7 @@ namespace ProjectX.Effect
 
             if (_feedback != null)
             {
-                _feedback.ShowBasket(quality, points, worldPos, _combo);
+                _feedback.ShowBasket(quality, points, worldPos);
             }
 
             if (_vfx != null)
@@ -123,6 +123,7 @@ namespace ProjectX.Effect
 
         void AnnounceMilestones(Vector3 worldPos)
         {
+            // Combo callouts (ON FIRE / UNSTOPPABLE) are disabled — keep punch/VFX only.
             if (_combo < ComboFireThreshold || _combo <= _bestComboAnnounced)
             {
                 return;
@@ -131,10 +132,6 @@ namespace ProjectX.Effect
             if (_combo == ComboFireThreshold)
             {
                 _bestComboAnnounced = _combo;
-                if (_feedback != null)
-                {
-                    _feedback.ShowMilestone("ON FIRE!");
-                }
                 if (_camera != null)
                 {
                     _camera.Punch(CameraEffect.StrongAmplitude, 0.26f);
@@ -147,10 +144,6 @@ namespace ProjectX.Effect
             else if (_combo == ComboUnstoppableThreshold)
             {
                 _bestComboAnnounced = _combo;
-                if (_feedback != null)
-                {
-                    _feedback.ShowMilestone("UNSTOPPABLE!");
-                }
                 if (_camera != null)
                 {
                     _camera.Punch(CameraEffect.StrongAmplitude, 0.3f);

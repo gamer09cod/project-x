@@ -93,6 +93,8 @@ public class ShotClock : MonoBehaviour
     {
         if (game.paused || isBuzzerBeater)
             return true;
+        if (game.ui != null && game.ui.IsQuitOverlayOpen)
+            return true;
         // Embed: clock already running from startRun — block only when expired and not in flight.
         if (game.embedMatchMode)
         {

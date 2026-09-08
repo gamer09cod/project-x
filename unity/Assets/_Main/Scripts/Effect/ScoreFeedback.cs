@@ -17,7 +17,8 @@ namespace ProjectX.Effect
 
         static readonly Color PointsColor = new Color(1f, 1f, 1f, 1f);
         static readonly Color SwishColor = new Color(1f, 0.72f, 0.2f, 1f);
-        static readonly Color ComboColor = new Color(0.45f, 0.85f, 1f, 1f);
+        static readonly Color HoopColor = new Color(0.55f, 0.9f, 1f, 1f);
+        static readonly Color BankColor = new Color(0.75f, 0.95f, 0.55f, 1f);
         static readonly Color MilestoneColor = new Color(1f, 0.36f, 0.26f, 1f);
 
         RectTransform _root;
@@ -77,31 +78,32 @@ namespace ProjectX.Effect
         // to reserve exactly this much headroom to keep the stack on screen.
         const float TopLine = 70f;
         const float MidLine = -2f;
-        const float ComboLine = -64f;
 
-        /// <summary>Feedback for a made basket, escalating with quality and combo.</summary>
-        public void ShowBasket(ShotQuality quality, int points, Vector3 worldPos, int combo)
+        /// <summary>Points + shot callout (SWISH / NICE / BANK). No combo text.</summary>
+        public void ShowBasket(ShotQuality quality, int points, Vector3 worldPos)
         {
-            // One anchor for the whole stack, clamped with room reserved for the
-            // highest and lowest lines. Clamping each line separately would keep
-            // them all on screen but collapse them onto the same point near an
-            // edge, so the lines would overlap instead of stacking.
-            Vector2 anchor = WorldToClamped(worldPos, TopLine, -ComboLine);
+            Vector2 anchor = WorldToClamped(worldPos, TopLine, -MidLine);
 
-            if (quality == ShotQuality.Perfect)
+            string callout;
+            Color calloutColor;
+            switch (quality)
             {
-                Show("SWISH!", SwishColor, 84f, anchor + new Vector2(0f, TopLine));
-                Show("+" + points, PointsColor, 62f, anchor + new Vector2(0f, MidLine));
-            }
-            else
-            {
-                Show("+" + points, PointsColor, 66f, anchor + new Vector2(0f, TopLine));
+                case ShotQuality.Perfect:
+                    callout = "SWISH!";
+                    calloutColor = SwishColor;
+                    break;
+                case ShotQuality.Backboard:
+                    callout = "BANK!";
+                    calloutColor = BankColor;
+                    break;
+                default:
+                    callout = "NICE!";
+                    calloutColor = HoopColor;
+                    break;
             }
 
-            if (combo >= 2)
-            {
-                Show("COMBO x" + combo, ComboColor, 52f, anchor + new Vector2(0f, ComboLine));
-            }
+            Show(callout, calloutColor, 84f, anchor + new Vector2(0f, TopLine));
+            Show("+" + points, PointsColor, 66f, anchor + new Vector2(0f, MidLine));
         }
 
         /// <summary>Large centred announcement (milestones, buzzer beater).</summary>

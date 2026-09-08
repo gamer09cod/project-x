@@ -146,6 +146,9 @@ public class Game : MonoBehaviour
             ball.UpdateBall();
         }
 
+        // The run can end while the quit card is open (RN abortRun on unmount).
+        // Closes the hosting panel too, so a rematch cannot start behind it.
+        ui?.CloseQuitUI();
         hoop?.ResetToIdle();
         shotClock?.ResetFrozen();
         shotClock?.SetInFlight(false);
@@ -209,6 +212,41 @@ public class Game : MonoBehaviour
         ResetPlayfieldForEmbed();
         embedMatchMode = false;
         Pause();
+    }
+
+    /// <summary>
+    /// True while an early quit is a legal action: a ranked run is live and no
+    /// shot is unresolved. Quitting mid-flight would append the attempt to the
+    /// shot log after the payload had already been built.
+    /// </summary>
+    public bool CanQuitEmbedRun()
+    {
+        if (!embedMatchMode || _embedOnFinished == null)
+            return false;
+        if (shotClock == null)
+            return false;
+        return !shotClock.inFlight && !shotClock.isBuzzerBeater;
+    }
+
+    /// <summary>
+    /// Player confirmed an early exit. The run ends here and the score they
+    /// already have is submitted, using the same payload path as the clock
+    /// running out — the server still owns settlement either way.
+    /// </summary>
+    public bool QuitEmbedRun()
+    {
+        if (!CanQuitEmbedRun())
+            return false;
+
+        shotClock.SetInFlight(false);
+        ProjectX.Effect.EffectEvents.RaiseRunEnded();
+        EmitEmbedScorePayload();
+
+        // Leave no live timer behind: without this the clock stays bound and
+        // started, so any later Resume would restart a real countdown that ends
+        // in the arcade game-over screen behind RN's result screen.
+        shotClock.ResetFrozen();
+        return true;
     }
 
     public void AddPoint()
@@ -310,6 +348,7 @@ public class Game : MonoBehaviour
 
     public void GameOver()
     {
+        ui?.CloseQuitUI();
         shotClock.SetInFlight(false);
         ProjectX.Effect.EffectEvents.RaiseRunEnded();
         if (embedMatchMode)

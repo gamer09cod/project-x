@@ -37,6 +37,8 @@ public class GameAudio : MonoBehaviour
 
     AudioSource source;
     AudioSource musicSource;
+    /// <summary>Layered celebration (cheer) so score one-shots cannot steal the voice.</summary>
+    AudioSource layerSource;
     float lastHitTime;
     /// <summary>True while an embed run is active (BeginEmbed → Pause/end).</summary>
     bool _gameplayActive;
@@ -61,16 +63,28 @@ public class GameAudio : MonoBehaviour
         source = GetComponent<AudioSource>();
         if (!source)
             source = gameObject.AddComponent<AudioSource>();
-        source.playOnAwake = false;
-        source.spatialBlend = 0f;
-        source.ignoreListenerPause = false;
-        source.loop = false;
+        ConfigureSfxSource(source);
 
         musicSource = gameObject.AddComponent<AudioSource>();
         musicSource.playOnAwake = false;
         musicSource.spatialBlend = 0f;
         musicSource.ignoreListenerPause = false;
         musicSource.loop = true;
+
+        layerSource = gameObject.AddComponent<AudioSource>();
+        ConfigureSfxSource(layerSource);
+        layerSource.priority = 32;
+    }
+
+    static void ConfigureSfxSource(AudioSource s)
+    {
+        s.playOnAwake = false;
+        s.spatialBlend = 0f;
+        s.ignoreListenerPause = false;
+        s.loop = false;
+        s.mute = false;
+        s.volume = 1f;
+        s.pitch = 1f;
     }
 
     void Start()
@@ -82,6 +96,8 @@ public class GameAudio : MonoBehaviour
                 musicSource.Stop();
             if (source != null)
                 source.Stop();
+            if (layerSource != null)
+                layerSource.Stop();
         }
     }
 
@@ -160,6 +176,8 @@ public class GameAudio : MonoBehaviour
         }
         if (source != null)
             source.Stop();
+        if (layerSource != null)
+            layerSource.Stop();
     }
 
     void ResetClockWarnState()
@@ -176,6 +194,8 @@ public class GameAudio : MonoBehaviour
             musicSource.Pause();
         if (source != null)
             source.Stop();
+        if (layerSource != null)
+            layerSource.Stop();
     }
 
     void RestoreIfGameplay()
@@ -204,7 +224,7 @@ public class GameAudio : MonoBehaviour
             return;
         musicSource.clip = bgMusic;
         musicSource.loop = true;
-        musicSource.volume = 0.55f;
+        musicSource.volume = 0.28f;
         musicSource.pitch = 1f;
         musicSource.Play();
     }
@@ -231,11 +251,11 @@ public class GameAudio : MonoBehaviour
         Play(netWhoosh, 0.45f, 1.1f);
     }
 
-    /// <summary>Miss resolved after recycle — soft negative sting (ground already played).</summary>
+    /// <summary>Miss resolved after recycle — soft descending dud (ground already played).</summary>
     public void PlayMiss()
     {
         if (missSting != null)
-            Play(missSting, 0.5f);
+            Play(missSting, 0.7f);
         else
             PlayRandom(bounceOutdoor, 0.7f);
     }
@@ -249,8 +269,10 @@ public class GameAudio : MonoBehaviour
     /// <summary>Buzzer-beater window active (clock at 0 with ball in air).</summary>
     public void PlayBuzzer()
     {
+        // Full-rate on the layer voice so the sting stays crisp while timeScale
+        // is 0.3x — same pattern as three_cheer.
         if (buzzer != null)
-            Play(buzzer, 1f);
+            PlayLayered(buzzer, 1f, 1f);
         else
             PlayRandom(bounceOutdoor, 0.55f, 0f, 0.85f);
     }
@@ -264,15 +286,27 @@ public class GameAudio : MonoBehaviour
             clip = scoreBackboard;
         Play(clip, 1f);
 
-        // Perfect = 3 pts in GameConfig — treat as three-pointer celebration.
+        // Perfect = 3 pts — crowd cheer on a separate voice so it is not lost
+        // under the net/score one-shot.
         if (quality == ShotQuality.Perfect)
             PlayThreePointer();
     }
 
     public void PlayThreePointer()
     {
-        Play(threeSting, 0.7f);
-        Play(threeCheer, 0.55f);
+        CancelInvoke(nameof(PlayThreeCheerNow));
+        // Slight delay so the cheer sits after the net hit, not under it.
+        Invoke(nameof(PlayThreeCheerNow), 0.08f);
+    }
+
+    void PlayThreeCheerNow()
+    {
+        if (!_gameplayActive)
+            return;
+        if (threeCheer != null)
+            PlayLayered(threeCheer, 1f);
+        else if (threeSting != null)
+            PlayLayered(threeSting, 0.75f);
     }
 
     void OnApplicationPause(bool pauseStatus)
@@ -321,5 +355,16 @@ public class GameAudio : MonoBehaviour
             return;
         source.pitch = pitch;
         source.PlayOneShot(clip, volume);
+    }
+
+    void PlayLayered(AudioClip clip, float volume, float pitch = 1f)
+    {
+        if (!_gameplayActive || !clip)
+            return;
+        AudioSource s = layerSource != null ? layerSource : source;
+        if (s == null)
+            return;
+        s.pitch = pitch;
+        s.PlayOneShot(clip, volume);
     }
 }

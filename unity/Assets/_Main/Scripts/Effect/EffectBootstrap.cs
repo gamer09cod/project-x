@@ -183,8 +183,10 @@ namespace ProjectX.Effect
         }
 
         /// <summary>
-        /// The score and clock sit flush against the top edge as authored, which
-        /// puts them under a notch or Dynamic Island. Inset them in place.
+        /// The live HUD sits flush against the top edge as authored, which puts
+        /// it under a notch or Dynamic Island. Inset the chrome bar in place —
+        /// never the clock TMP. That leaf stretch-fills a 100px chip; treating it
+        /// as a full-screen panel crushes auto-size down to the 18pt floor.
         /// </summary>
         static void ApplyHudInsets(UI ui)
         {
@@ -193,17 +195,21 @@ namespace ProjectX.Effect
                 return;
             }
 
-            // Only the live HUD. score[1] and score[2] are the game-over panel
-            // readouts on the Screen UI canvas, which are centre-anchored and
-            // laid out by their own panel.
-            if (ui.clock != null)
-            {
-                AddInset(ui.clock.gameObject);
-            }
-
+            // Live HUD only. score[1]/[2] are game-over panel readouts.
             if (ui.score != null && ui.score.Length > 0 && ui.score[0] != null)
             {
-                AddInset(ui.score[0].gameObject);
+                // Prefer the top chrome bar (stretch-top parent) over the leaf TMP,
+                // which is often mid-right and would only shift sideways.
+                Transform leaf = ui.score[0].transform;
+                Transform bar = leaf.parent != null ? leaf.parent.parent : null;
+                if (bar != null)
+                {
+                    AddInset(bar.gameObject);
+                }
+                else
+                {
+                    AddInset(leaf.gameObject);
+                }
             }
         }
 
