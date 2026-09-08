@@ -1,15 +1,17 @@
-import React, {useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {
   ActivityIndicator,
   ImageBackground,
   KeyboardAvoidingView,
   Linking,
   Platform,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type TextInput as TextInputType,
 } from 'react-native';
 import {
   createUserWithEmailAndPassword,
@@ -127,42 +129,53 @@ export function EmailAuthScreen({onSignedIn}: Props): React.JSX.Element {
 
         <KeyboardAvoidingView
           style={styles.body}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          {step === 'landing' ? (
-            <FadeSlideIn delay={40} distance={16} style={styles.hero}>
-              <Text style={styles.heroLine}>STAKE N</Text>
-              <Text style={[styles.heroLine, styles.heroEarn]}>EARN</Text>
-              <Text style={styles.tagline}>Play. Compete. Win.</Text>
-            </FadeSlideIn>
-          ) : (
-            <View style={styles.heroSpacer} />
-          )}
-
-          <FadeSlideIn delay={120} distance={18} style={styles.sheet}>
+          behavior="padding"
+          keyboardVerticalOffset={
+            Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0
+          }>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[
+              styles.scrollContent,
+              step !== 'landing' ? styles.scrollForm : null,
+            ]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}>
             {step === 'landing' ? (
-              <LandingActions
-                busy={busy}
-                onEmail={() => onLanding('signIn')}
-                onCreate={() => onLanding('signUp')}
-              />
-            ) : (
-              <EmailForm
-                mode={step}
-                email={email}
-                password={password}
-                busy={busy}
-                error={error}
-                onEmail={setEmail}
-                onPassword={setPassword}
-                onBack={() => onLanding('landing')}
-                onSubmit={() => run(step)}
-                onSwitchMode={() =>
-                  onLanding(step === 'signIn' ? 'signUp' : 'signIn')
-                }
-              />
-            )}
-            <Legal />
-          </FadeSlideIn>
+              <FadeSlideIn delay={40} distance={16} style={styles.hero}>
+                <Text style={styles.heroLine}>STAKE N</Text>
+                <Text style={[styles.heroLine, styles.heroEarn]}>EARN</Text>
+                <Text style={styles.tagline}>Play. Compete. Win.</Text>
+              </FadeSlideIn>
+            ) : null}
+
+            <FadeSlideIn delay={120} distance={18} style={styles.sheet}>
+              {step === 'landing' ? (
+                <LandingActions
+                  busy={busy}
+                  onEmail={() => onLanding('signIn')}
+                  onCreate={() => onLanding('signUp')}
+                />
+              ) : (
+                <EmailForm
+                  mode={step}
+                  email={email}
+                  password={password}
+                  busy={busy}
+                  error={error}
+                  onEmail={setEmail}
+                  onPassword={setPassword}
+                  onBack={() => onLanding('landing')}
+                  onSubmit={() => run(step)}
+                  onSwitchMode={() =>
+                    onLanding(step === 'signIn' ? 'signUp' : 'signIn')
+                  }
+                />
+              )}
+              <Legal />
+            </FadeSlideIn>
+          </ScrollView>
         </KeyboardAvoidingView>
       </ScreenSafe>
     </ImageBackground>
@@ -228,6 +241,7 @@ function EmailForm({
   onSubmit: () => void;
   onSwitchMode: () => void;
 }): React.JSX.Element {
+  const passwordRef = useRef<TextInputType>(null);
   const submitLabel = mode === 'signUp' ? 'Create account' : 'Sign in';
   const switchLabel =
     mode === 'signUp' ? 'Have an account? Sign in' : 'Need an account? Create one';
@@ -256,8 +270,11 @@ function EmailForm({
         onChangeText={onEmail}
         editable={!busy}
         returnKeyType="next"
+        blurOnSubmit={false}
+        onSubmitEditing={() => passwordRef.current?.focus()}
       />
       <TextInput
+        ref={passwordRef}
         style={styles.input}
         autoComplete="password"
         secureTextEntry
@@ -368,14 +385,20 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'space-between',
+  },
+  scrollForm: {
+    justifyContent: 'flex-end',
   },
   hero: {
     paddingHorizontal: 24,
     paddingTop: 36,
-  },
-  heroSpacer: {
-    flex: 1,
   },
   heroLine: {
     color: colors.textPrimary,
