@@ -36,6 +36,7 @@ namespace ProjectX.ArcadeBasketball
         bool _atLeft = true;
         bool _pendingRelocation;
         bool _relocating;
+        int _moveGen;
 
         void Awake()
         {
@@ -76,6 +77,7 @@ namespace ProjectX.ArcadeBasketball
             if (hoop != null)
                 LeanTween.cancel(hoop.gameObject);
 
+            _moveGen++;
             _pendingRelocation = false;
             _relocating = false;
         }
@@ -121,9 +123,15 @@ namespace ProjectX.ArcadeBasketball
             if (ball != null && hoopTarget != null)
                 ball.SetTargetHoop(hoopTarget);
 
+            int gen = ++_moveGen;
             LeanTween.move(hoop.gameObject, dest.position, config.moveDuration)
                 .setEaseOutCubic()
-                .setOnComplete(OnSlideInComplete);
+                .setOnComplete(() =>
+                {
+                    if (gen != _moveGen)
+                        return;
+                    OnSlideInComplete();
+                });
         }
 
         void OnSlideInComplete()
@@ -145,11 +153,86 @@ namespace ProjectX.ArcadeBasketball
                 return;
 
             scoreDetector.BeginNewCycle();
+            ApplyScoringLock();
+        }
+
+        /// <summary>Cancel a slide and snap to the current side. Safe to call from BeginRound.</summary>
+        public void ResetForNewRound()
+        {
+            _moveGen++;
+            if (hoop != null)
+                LeanTween.cancel(hoop.gameObject);
+
+            _pendingRelocation = false;
+            _relocating = false;
+
+            Transform rest = _atLeft ? leftAnchor : rightAnchor;
+            if (hoop != null && rest != null)
+            {
+                hoop.position = rest.position;
+                hoop.localScale = rest.localScale;
+            }
+
+            if (ball != null && hoopTarget != null)
+                ball.SetTargetHoop(hoopTarget);
+
+            if (scoreDetector != null)
+                scoreDetector.BeginNewCycle();
+        }
+
+        void ApplyScoringLock()
+        {
+            if (scoreDetector == null)
+                return;
 
             ArcadeRoundController round = GetComponent<ArcadeRoundController>();
-            bool allowScore = round == null
-                || (round.State == ArcadeRoundState.Playing && !round.IsPaused);
+            bool allowScore = !_pendingRelocation && !_relocating
+                && (round == null
+                    || (round.State == ArcadeRoundState.Playing && !round.IsPaused));
             scoreDetector.SetScoringLocked(!allowScore);
+        }
+
+        public bool AtLeft => _atLeft;
+
+        public bool IsMoving => _relocating || _pendingRelocation;
+
+        public Vector3 DebugHoopPosition => hoop != null ? hoop.position : transform.position;
+
+        public Vector3 DebugLeftAnchor => leftAnchor != null ? leftAnchor.position : default;
+
+        public Vector3 DebugRightAnchor => rightAnchor != null ? rightAnchor.position : default;
+
+        public Vector3 DebugHoopTarget => hoopTarget != null ? hoopTarget.position : default;
+
+        /// <summary>Debug: cancel a slide and snap to an anchor.</summary>
+        public void DebugSnapToSide(bool left)
+        {
+            if (hoop == null || leftAnchor == null || rightAnchor == null)
+                return;
+
+            LeanTween.cancel(hoop.gameObject);
+            _moveGen++;
+            _pendingRelocation = false;
+            _relocating = false;
+            _atLeft = left;
+
+            Transform rest = _atLeft ? leftAnchor : rightAnchor;
+            hoop.position = rest.position;
+            hoop.localScale = rest.localScale;
+
+            if (ball != null && hoopTarget != null)
+                ball.SetTargetHoop(hoopTarget);
+
+            if (scoreDetector == null)
+                return;
+
+            scoreDetector.BeginNewCycle();
+            ApplyScoringLock();
+        }
+
+        public void DebugFlipSide()
+        {
+            DebugSnapToSide(!_atLeft);
         }
     }
 }

@@ -588,6 +588,8 @@ GameObject:
   - component: {fileID: 850000010}
   - component: {fileID: 850000011}
   - component: {fileID: 850000012}
+  - component: {fileID: 850000013}
+  - component: {fileID: 850000014}
   m_Layer: 0
   m_Name: ArcadeGameplay
   m_TagString: Untagged
@@ -731,6 +733,8 @@ MonoBehaviour:
   autoStart: 1
   showEditorOverlay: 1
   scoreFeedback: {fileID: 850000010}
+  hoopArcade: {fileID: 850000008}
+  cameraFeel: {fileID: 850000014}
 --- !u!114 &850000010
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -790,7 +794,7 @@ MonoBehaviour:
   netWhoosh: {fileID: 8300000, guid: 55534f4d75d1d0d47af66dccd694e9c5, type: 3}
   hoopMove: {fileID: 8300000, guid: 55534f4d75d1d0d47af66dccd694e9c5, type: 3}
   whistle: {fileID: 8300000, guid: d94487649d95ea14690cfe92378c33bf, type: 3}
-  backgroundMusic: {fileID: 8300000, guid: 2c1761644f4b55144b3bb440afed110b, type: 3}
+  backgroundMusic: {fileID: 8300000, guid: ebfbf60e30bb2ed43b0296e5a6515e29, type: 3}
   musicVolume: 0.26
 --- !u!82 &850000012
 AudioSource:
@@ -889,6 +893,41 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &850000013
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 850000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c61738495a6b7c8d9e0f1a2b3c4d5e60, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  overlayEnabled: 1
+  drawGizmos: 1
+  ball: {fileID: 307286801}
+  hoop: {fileID: 850000008}
+  round: {fileID: 850000009}
+  scoreDetector: {fileID: 880000100}
+--- !u!114 &850000014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 850000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8295a6b7c8d9e0f1a2b3c4d5e607182, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  worldCamera: {fileID: 1976763729}
+  farLayer: {fileID: 1840101584}
+  midLayer: {fileID: 987132455}
+  scoreDetector: {fileID: 880000100}
+  hoopConfig: {fileID: 11400000, guid: 2d3e4f5a6b708192a3b4c5d6e7f8091a, type: 2}
 --- !u!1 &860000001
 GameObject:
   m_ObjectHideFlags: 0

@@ -18,3 +18,9 @@ MonoBehaviour:
   netStretch: 0.22
   netSquash: 0.1
   netPerfectIntensity: 1.7
+  shakeDuration: 0.28
+  shakePerfect: 0.16
+  shakeRim: 0.1
+  shakeBackboard: 0.07
+  parallaxFar: 0.28
+  parallaxMid: 0.58

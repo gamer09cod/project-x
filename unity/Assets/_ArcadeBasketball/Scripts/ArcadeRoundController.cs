@@ -44,6 +44,12 @@ namespace ProjectX.ArcadeBasketball
         [SerializeField]
         ArcadeScoreFeedback scoreFeedback;
 
+        [SerializeField]
+        HoopArcadeController hoopArcade;
+
+        [SerializeField]
+        ArcadeCameraFeel cameraFeel;
+
         public ArcadeRoundState State { get; private set; } = ArcadeRoundState.Initializing;
 
         public int Score { get; private set; }
@@ -76,6 +82,12 @@ namespace ProjectX.ArcadeBasketball
 
             if (scoreFeedback == null)
                 scoreFeedback = GetComponent<ArcadeScoreFeedback>();
+
+            if (hoopArcade == null)
+                hoopArcade = GetComponent<HoopArcadeController>();
+
+            if (cameraFeel == null)
+                cameraFeel = GetComponent<ArcadeCameraFeel>();
 
             if (ballBody != null)
                 _ballSpawnPosition = ballBody.position;
@@ -140,6 +152,12 @@ namespace ProjectX.ArcadeBasketball
 
             State = ArcadeRoundState.Initializing;
             ApplyInputAndScoring(false);
+            if (ball != null)
+                ball.ResetForNewRound();
+            if (hoopArcade != null)
+                hoopArcade.ResetForNewRound();
+            if (cameraFeel != null)
+                cameraFeel.ResetNow();
             HoldBallAtSpawn();
             if (ball != null)
                 ball.ClearShotContact();
@@ -265,7 +283,10 @@ namespace ProjectX.ArcadeBasketball
                 tapInput.SetInputEnabled(playing);
 
             if (scoreDetector != null)
-                scoreDetector.SetScoringLocked(!playing);
+            {
+                bool hoopBusy = hoopArcade != null && hoopArcade.IsMoving;
+                scoreDetector.SetScoringLocked(!playing || hoopBusy);
+            }
         }
 
         void HoldBallAtSpawn()

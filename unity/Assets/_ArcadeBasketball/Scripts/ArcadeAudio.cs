@@ -6,7 +6,7 @@ namespace ProjectX.ArcadeBasketball
     /// <summary>
     /// Arcade SFX, looping bed music, and haptics. Inspector clips — does not use
     /// GameAudio.Instance. Music lives on its own source at pitch 1 so SFX pitch
-    /// cannot drag the bed. Collision hits share a cooldown so Stay/jitter cannot spam.
+    /// cannot drag the bed. It starts after the opening whistle, not during countdown.
     /// Floor bounce SFX is on a dedicated source and plays on inbound impact,
     /// including the settle landing after the first bounce.
     /// </summary>
@@ -88,6 +88,7 @@ namespace ProjectX.ArcadeBasketball
         AudioSource _musicSource;
         float _musicGain;
         float _musicDuck;
+        float _musicHoldoff;
         bool _appMuted;
 
         void Awake()
@@ -247,8 +248,10 @@ namespace ProjectX.ArcadeBasketball
 
         void HandleGameStart()
         {
-            DuckMusic(0.4f);
             Play(whistle, 0.72f);
+            _musicHoldoff = 0.05f;
+            if (whistle != null)
+                _musicHoldoff += whistle.length;
         }
 
         bool TryConsumeCollisionSfx()
@@ -307,12 +310,12 @@ namespace ProjectX.ArcadeBasketball
 
             bool paused = _appMuted || (round != null && round.IsPaused);
             ArcadeRoundState state = round != null ? round.State : ArcadeRoundState.Initializing;
-            bool inRound = state == ArcadeRoundState.Countdown
-                || state == ArcadeRoundState.Playing
-                || state == ArcadeRoundState.RoundEnding;
 
             _musicDuck = Mathf.MoveTowards(
                 _musicDuck, 0f, Time.unscaledDeltaTime / MusicDuckRecoverSeconds);
+
+            if (_musicHoldoff > 0f)
+                _musicHoldoff -= Time.unscaledDeltaTime;
 
             if (paused)
             {
@@ -322,7 +325,11 @@ namespace ProjectX.ArcadeBasketball
                 return;
             }
 
-            if (inRound)
+            bool afterWhistle = (state == ArcadeRoundState.Playing
+                    || state == ArcadeRoundState.RoundEnding)
+                && _musicHoldoff <= 0f;
+
+            if (afterWhistle)
             {
                 EnsureMusicPlaying();
                 _musicGain = Mathf.MoveTowards(
@@ -384,6 +391,7 @@ namespace ProjectX.ArcadeBasketball
         {
             _musicGain = 0f;
             _musicDuck = 0f;
+            _musicHoldoff = 0f;
             if (_musicSource == null)
                 return;
             _musicSource.Stop();

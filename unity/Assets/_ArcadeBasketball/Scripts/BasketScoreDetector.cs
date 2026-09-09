@@ -125,5 +125,17 @@ namespace ProjectX.ArcadeBasketball
 
             OnBasketScored?.Invoke(quality);
         }
+
+        /// <summary>Debug: fire a make without the ball passing the triggers.</summary>
+        public void DebugForceScore(ArcadeShotQuality quality)
+        {
+            if (ScoringLocked)
+                return;
+
+            _state = CycleState.Scored;
+            if (logScores)
+                Debug.Log($"[ArcadeBasketball] debug basket quality={quality}", this);
+            OnBasketScored?.Invoke(quality);
+        }
     }
 }

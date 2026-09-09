@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: RoundGameplayConfig
   m_EditorClassIdentifier: ProjectX.ArcadeBasketball.RoundGameplayConfig
   roundDuration: 60
-  countdownSeconds: 3
+  countdownSeconds: 0
   roundEndingSeconds: 0.4

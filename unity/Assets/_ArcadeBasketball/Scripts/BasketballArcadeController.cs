@@ -108,7 +108,6 @@ namespace ProjectX.ArcadeBasketball
             if (tapInput != null)
                 tapInput.OnGameplayTap -= HandleGameplayTap;
 
-            OnGroundHit = null;
             _pendingTap = false;
             _isRecovering = false;
             _hitRim = false;
@@ -133,9 +132,41 @@ namespace ProjectX.ArcadeBasketball
             return ArcadeShotQuality.Backboard;
         }
 
+        /// <summary>Debug: snap the same body back to the Awake spawn. No OOB delay.</summary>
+        public void DebugResetToSpawn()
+        {
+            if (_body == null)
+                return;
+
+            _isRecovering = false;
+            _pendingTap = false;
+            _steeringSuppressedUntil = 0f;
+            _grounded = false;
+            _floorImpactArmed = true;
+            ClearShotContact();
+            FreezeBody();
+            _body.position = _safeSpawnPosition;
+        }
+
+        /// <summary>Cancel OOB recovery and queued taps. Round owns the spawn snap.</summary>
+        public void ResetForNewRound()
+        {
+            _isRecovering = false;
+            _pendingTap = false;
+            _steeringSuppressedUntil = 0f;
+            _grounded = false;
+            _floorImpactArmed = true;
+            ClearShotContact();
+            if (_body != null)
+                FreezeBody();
+        }
+
         void HandleGameplayTap(Vector2 _)
         {
             if (_isRecovering)
+                return;
+
+            if (_pendingTap)
                 return;
 
             if (!BasketballGameplayConfig.TryGet(gameplayConfig, this, out BasketballGameplayConfig config))
@@ -300,13 +331,10 @@ namespace ProjectX.ArcadeBasketball
 
         void TickRecovery()
         {
-            // Round countdown / results owns the body. Pause uses timeScale 0 so this tick does not run.
+            // Pause sets timeScale 0 so this does not run. Countdown/results
+            // set simulated false — keep recovering until ResetForNewRound or Finish.
             if (!_body.simulated)
-            {
-                _isRecovering = false;
-                _pendingTap = false;
                 return;
-            }
 
             _recoverySecondsLeft -= Time.fixedDeltaTime;
             FreezeBody();
@@ -322,6 +350,9 @@ namespace ProjectX.ArcadeBasketball
             _body.position = _safeSpawnPosition;
             _pendingTap = false;
             _isRecovering = false;
+            _grounded = false;
+            _floorImpactArmed = true;
+            ClearShotContact();
         }
 
         void FreezeBody()

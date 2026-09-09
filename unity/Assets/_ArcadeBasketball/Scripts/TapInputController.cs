@@ -69,6 +69,9 @@ namespace ProjectX.ArcadeBasketball
 
         void RaiseTap(Vector2 screenPosition)
         {
+            if (ArcadeDebugOverlay.BlocksTap(screenPosition))
+                return;
+
             if (logTaps)
                 Debug.Log($"[TapInput] gameplay tap @ {screenPosition}", this);
 
