@@ -16,6 +16,20 @@ namespace ProjectX.ArcadeBasketball
         [Tooltip("Brief beat after the clock hits 0 before Results.")]
         public float roundEndingSeconds = 0.4f;
 
+        public static bool TryGet(
+            RoundGameplayConfig config,
+            Object context,
+            out RoundGameplayConfig ready)
+        {
+            ready = config;
+            if (config != null)
+                return true;
+
+            Debug.LogError("[ArcadeBasketball] RoundGameplayConfig is not assigned.", context);
+            Debug.Assert(false, "RoundGameplayConfig is required.", context);
+            return false;
+        }
+
         void OnValidate()
         {
             roundDuration = Mathf.Max(1f, roundDuration);

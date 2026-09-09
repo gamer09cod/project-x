@@ -50,6 +50,15 @@ namespace ProjectX.ArcadeBasketball
         [Tooltip("Rolling slowdown on the floor (units/s²). ~2 lets it roll a beat then settle. Air X still coasts.")]
         public float groundDrag = 2f;
 
+        [Tooltip("Snap floor X to 0 when slower than this.")]
+        public float groundStopSpeed = 0.05f;
+
+        [Tooltip("Play floor SFX when inbound fall speed is at least this.")]
+        public float groundSfxMinIncoming = 0.75f;
+
+        [Tooltip("Re-arm a floor impact if the ball is moving up this fast while still overlapping.")]
+        public float floorStayReArmY = 0.25f;
+
         [Header("Collision steering")]
         [Tooltip("Blend toward hoop X on tap after a rim/backboard hit. 1 = full tap X, 0.25 keeps most of the bounce.")]
         public float collisionSteeringMultiplier = 0.25f;
@@ -59,6 +68,9 @@ namespace ProjectX.ArcadeBasketball
 
         [Tooltip("Ignore glancing hits below this |linearVelocity| for steering suppression.")]
         public float minimumCollisionSpeedForSuppression = 0.5f;
+
+        [Tooltip("Min seconds between rim / backboard SFX. Floor bounce ignores this.")]
+        public float hoopSolidSfxCooldown = 0.08f;
 
         [Header("Recovery")]
         [Tooltip("World Y below the court. Ball recovers if it falls under this.")]
@@ -143,9 +155,13 @@ namespace ProjectX.ArcadeBasketball
             maxBounceSpeed = Mathf.Max(0f, maxBounceSpeed);
             groundRestSpeed = Mathf.Max(0f, groundRestSpeed);
             groundDrag = Mathf.Max(0f, groundDrag);
+            groundStopSpeed = Mathf.Max(0f, groundStopSpeed);
+            groundSfxMinIncoming = Mathf.Max(0f, groundSfxMinIncoming);
+            floorStayReArmY = Mathf.Max(0f, floorStayReArmY);
             collisionSteeringMultiplier = Mathf.Max(0f, collisionSteeringMultiplier);
             collisionSteeringDuration = Mathf.Max(0f, collisionSteeringDuration);
             minimumCollisionSpeedForSuppression = Mathf.Max(0f, minimumCollisionSpeedForSuppression);
+            hoopSolidSfxCooldown = Mathf.Max(0f, hoopSolidSfxCooldown);
             outOfBoundsX = Mathf.Max(0f, outOfBoundsX);
             ballRecoveryDelay = Mathf.Max(0f, ballRecoveryDelay);
             shadowMinScale = Mathf.Clamp(shadowMinScale, 0.05f, 1f);

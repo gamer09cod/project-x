@@ -28,7 +28,11 @@ namespace ProjectX.ArcadeBasketball
             _onDone = onDone;
 
             if (font != null)
+            {
                 _label.font = font;
+                if (font.material != null)
+                    _label.fontSharedMaterial = font.material;
+            }
 
             _label.alignment = TextAlignmentOptions.Center;
             _label.raycastTarget = false;

@@ -32,8 +32,17 @@ namespace ProjectX.ArcadeBasketball
         [SerializeField]
         Transform visual;
 
-        /// <summary>Ball contacted the court floor (WallBottom).</summary>
+        /// <summary>Ball contacted the court floor (WallBottom). Also fires on Stay.</summary>
         public event Action OnGroundHit;
+
+        /// <summary>Tap was accepted and will apply lift this physics step.</summary>
+        public event Action OnTapApplied;
+
+        /// <summary>Floor bounce with outbound Y (not a settle). Collision SFX.</summary>
+        public event Action OnGroundBounce;
+
+        /// <summary>Ball struck rim or backboard this Enter. Collision SFX.</summary>
+        public event Action<HoopSolidKind> OnHoopSolidHit;
 
         public BasketballGameplayConfig GameplayConfig => gameplayConfig;
 
@@ -50,6 +59,7 @@ namespace ProjectX.ArcadeBasketball
         float _debugDesiredX;
         float _steeringSuppressedUntil;
         Vector2 _velocityBeforePhysics;
+        bool _floorImpactArmed = true;
 
         void Awake()
         {
@@ -105,6 +115,7 @@ namespace ProjectX.ArcadeBasketball
             _hitBackboard = false;
             _grounded = false;
             _steeringSuppressedUntil = 0f;
+            _floorImpactArmed = true;
         }
 
         public void ClearShotContact()
@@ -135,6 +146,7 @@ namespace ProjectX.ArcadeBasketball
 
             _nextTapTime = Time.time + config.tapCooldown;
             _pendingTap = true;
+            OnTapApplied?.Invoke();
         }
 
         public void SetTargetHoop(Transform hoop)
@@ -333,7 +345,7 @@ namespace ProjectX.ArcadeBasketball
                     velocity.y = 0f;
 
                 velocity.x = Mathf.MoveTowards(velocity.x, 0f, config.groundDrag * dt);
-                if (Mathf.Abs(velocity.x) < 0.05f)
+                if (Mathf.Abs(velocity.x) < config.groundStopSpeed)
                     velocity.x = 0f;
             }
             else
@@ -375,6 +387,7 @@ namespace ProjectX.ArcadeBasketball
             if (collision.collider.GetComponent<CourtGroundMarker>() != null)
             {
                 _grounded = true;
+                _floorImpactArmed = false;
                 ApplyGroundBounce();
                 OnGroundHit?.Invoke();
                 return;
@@ -388,6 +401,8 @@ namespace ProjectX.ArcadeBasketball
                 _hitBackboard = true;
             else
                 _hitRim = true;
+
+            OnHoopSolidHit?.Invoke(solid.Kind);
 
             if (!BasketballGameplayConfig.TryGet(gameplayConfig, this, out BasketballGameplayConfig config))
                 return;
@@ -412,12 +427,15 @@ namespace ProjectX.ArcadeBasketball
 
             float incomingDown = Mathf.Max(0f, -_velocityBeforePhysics.y);
             Vector2 velocity = _body.linearVelocity;
+            bool playSfx = incomingDown >= config.groundSfxMinIncoming;
 
             if (incomingDown < config.groundRestSpeed)
             {
                 velocity.y = 0f;
                 _body.linearVelocity = velocity;
                 _velocityBeforePhysics = velocity;
+                if (playSfx)
+                    OnGroundBounce?.Invoke();
                 return;
             }
 
@@ -428,6 +446,8 @@ namespace ProjectX.ArcadeBasketball
             velocity.y = bounceY;
             _body.linearVelocity = velocity;
             _velocityBeforePhysics = velocity;
+            if (playSfx)
+                OnGroundBounce?.Invoke();
         }
 
         void OnCollisionStay2D(Collision2D collision)
@@ -435,17 +455,32 @@ namespace ProjectX.ArcadeBasketball
             if (_isRecovering)
                 return;
 
-            if (collision.collider != null && collision.collider.GetComponent<CourtGroundMarker>() != null)
+            if (collision.collider == null || collision.collider.GetComponent<CourtGroundMarker>() == null)
+                return;
+
+            _grounded = true;
+            OnGroundHit?.Invoke();
+
+            if (!BasketballGameplayConfig.TryGet(gameplayConfig, this, out BasketballGameplayConfig config))
+                return;
+
+            if (_body != null && _body.linearVelocity.y > config.floorStayReArmY)
+                _floorImpactArmed = true;
+
+            if (_floorImpactArmed && _velocityBeforePhysics.y < -config.groundSfxMinIncoming)
             {
-                _grounded = true;
-                OnGroundHit?.Invoke();
+                _floorImpactArmed = false;
+                ApplyGroundBounce();
             }
         }
 
         void OnCollisionExit2D(Collision2D collision)
         {
             if (collision.collider != null && collision.collider.GetComponent<CourtGroundMarker>() != null)
+            {
                 _grounded = false;
+                _floorImpactArmed = true;
+            }
         }
 
 #if UNITY_EDITOR

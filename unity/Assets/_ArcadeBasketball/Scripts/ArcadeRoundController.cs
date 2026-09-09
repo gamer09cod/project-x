@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace ProjectX.ArcadeBasketball
@@ -51,13 +52,15 @@ namespace ProjectX.ArcadeBasketball
 
         public bool IsPaused { get; private set; }
 
+        /// <summary>Clock and taps just went live (after countdown, or restart into Playing).</summary>
+        public event Action OnPlayingStarted;
+
         Vector3 _ballSpawnPosition;
         float _phaseSecondsLeft;
 
         void Awake()
         {
-            if (roundConfig == null)
-                Debug.LogError("[ArcadeBasketball] RoundGameplayConfig is not assigned.", this);
+            RoundGameplayConfig.TryGet(roundConfig, this, out roundConfig);
 
             if (tapInput == null)
                 tapInput = FindFirstObjectByType<TapInputController>();
@@ -184,6 +187,8 @@ namespace ProjectX.ArcadeBasketball
                 ballBody.simulated = true;
                 ballBody.gravityScale = 0f;
             }
+
+            OnPlayingStarted?.Invoke();
         }
 
         void EnterRoundEnding()

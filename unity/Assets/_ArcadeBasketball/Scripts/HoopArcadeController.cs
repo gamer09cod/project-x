@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace ProjectX.ArcadeBasketball
@@ -8,6 +9,9 @@ namespace ProjectX.ArcadeBasketball
     /// </summary>
     public sealed class HoopArcadeController : MonoBehaviour
     {
+        /// <summary>Hoop started sliding in from off-screen.</summary>
+        public event Action OnHoopMove;
+
         [SerializeField]
         Transform hoop;
 
@@ -26,13 +30,8 @@ namespace ProjectX.ArcadeBasketball
         [SerializeField]
         BasketballArcadeController ball;
 
-        [Tooltip("Seconds to slide in from off-screen.")]
         [SerializeField]
-        float moveDuration = 0.3f;
-
-        [Tooltip("How far off-screen the hoop starts, past the destination anchor.")]
-        [SerializeField]
-        float enterDistance = 3.5f;
+        HoopGameplayConfig hoopConfig;
 
         bool _atLeft = true;
         bool _pendingRelocation;
@@ -50,6 +49,8 @@ namespace ProjectX.ArcadeBasketball
                 Debug.LogError("[ArcadeBasketball] HoopArcadeController needs BasketScoreDetector.", this);
             if (ball == null)
                 ball = FindFirstObjectByType<BasketballArcadeController>();
+
+            HoopGameplayConfig.TryGet(hoopConfig, this, out hoopConfig);
         }
 
         void OnEnable()
@@ -100,23 +101,27 @@ namespace ProjectX.ArcadeBasketball
 
         void SlideInFromOffscreen()
         {
+            if (!HoopGameplayConfig.TryGet(hoopConfig, this, out HoopGameplayConfig config))
+                return;
+
             Transform dest = _atLeft ? rightAnchor : leftAnchor;
             _relocating = true;
 
             LeanTween.cancel(hoop.gameObject);
 
+            OnHoopMove?.Invoke();
+
             hoop.localScale = dest.localScale;
 
             float fromXSign = dest.position.x >= 0f ? 1f : -1f;
             Vector3 start = dest.position;
-            start.x += fromXSign * enterDistance;
+            start.x += fromXSign * config.enterDistance;
             hoop.position = start;
 
             if (ball != null && hoopTarget != null)
                 ball.SetTargetHoop(hoopTarget);
 
-            float duration = Mathf.Clamp(moveDuration, 0.25f, 0.45f);
-            LeanTween.move(hoop.gameObject, dest.position, duration)
+            LeanTween.move(hoop.gameObject, dest.position, config.moveDuration)
                 .setEaseOutCubic()
                 .setOnComplete(OnSlideInComplete);
         }

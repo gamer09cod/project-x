@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ProjectX.Effect;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,7 +17,16 @@ namespace ProjectX.ArcadeBasketball
         [SerializeField]
         Camera worldCamera;
 
+        [Tooltip("Main in-game score font (Lilita One).")]
+        [SerializeField]
+        TMP_FontAsset hudFont;
+
+        [Tooltip("Main score-popup font. Falls back to hudFont.")]
+        [SerializeField]
+        TMP_FontAsset popupFont;
+
         RectTransform _canvasRect;
+        RectTransform _safeRect;
         TextMeshProUGUI _hud;
         Vector3 _hudRestScale = Vector3.one;
         float _hudBump;
@@ -28,9 +38,9 @@ namespace ProjectX.ArcadeBasketball
                 worldCamera = Camera.main;
 
             BuildCanvas();
-            TMP_FontAsset font = TMP_Settings.defaultFontAsset;
+            TMP_FontAsset popup = ResolveFont(popupFont);
             for (int i = 0; i < PoolSize; i++)
-                _free.Add(CreatePopup(i, font));
+                _free.Add(CreatePopup(i, popup));
         }
 
         void Update()
@@ -124,6 +134,7 @@ namespace ProjectX.ArcadeBasketball
             scaler.matchWidthOrHeight = 0.5f;
 
             _canvasRect = canvasGo.GetComponent<RectTransform>();
+            _safeRect = CreateSafeArea(canvasGo.transform);
 
             var hudGo = new GameObject("ScoreHud", typeof(RectTransform), typeof(TextMeshProUGUI));
             hudGo.transform.SetParent(canvasGo.transform, false);
@@ -134,10 +145,11 @@ namespace ProjectX.ArcadeBasketball
             hudRect.anchoredPosition = new Vector2(0f, -36f);
             hudRect.sizeDelta = new Vector2(280f, 96f);
 
+            HudSafeInset inset = hudGo.AddComponent<HudSafeInset>();
+            inset.extraPadding = new Vector2(12f, 16f);
+
             _hud = hudGo.GetComponent<TextMeshProUGUI>();
-            TMP_FontAsset font = TMP_Settings.defaultFontAsset;
-            if (font != null)
-                _hud.font = font;
+            ApplyFont(_hud, ResolveFont(hudFont));
             _hud.alignment = TextAlignmentOptions.Center;
             _hud.fontSize = 64f;
             _hud.color = Color.white;
@@ -152,7 +164,8 @@ namespace ProjectX.ArcadeBasketball
                 "ScorePopup" + index,
                 typeof(RectTransform),
                 typeof(TextMeshProUGUI));
-            go.transform.SetParent(_canvasRect, false);
+            Transform popupParent = _safeRect != null ? _safeRect : _canvasRect;
+            go.transform.SetParent(popupParent, false);
             ArcadeScorePopup popup = go.AddComponent<ArcadeScorePopup>();
             popup.Init(font, Release);
             return popup;
@@ -175,9 +188,25 @@ namespace ProjectX.ArcadeBasketball
                 _free.Add(popup);
         }
 
+        RectTransform CreateSafeArea(Transform canvas)
+        {
+            var safeGo = new GameObject("SafeArea", typeof(RectTransform));
+            safeGo.transform.SetParent(canvas, false);
+
+            RectTransform safeRect = safeGo.GetComponent<RectTransform>();
+            safeRect.anchorMin = Vector2.zero;
+            safeRect.anchorMax = Vector2.one;
+            safeRect.offsetMin = Vector2.zero;
+            safeRect.offsetMax = Vector2.zero;
+            safeRect.pivot = new Vector2(0.5f, 0.5f);
+            safeGo.AddComponent<SafeAreaPanel>();
+            return safeRect;
+        }
+
         Vector2 WorldToCanvas(Vector3 worldPos)
         {
-            if (_canvasRect == null)
+            RectTransform root = _safeRect != null ? _safeRect : _canvasRect;
+            if (root == null)
                 return Vector2.zero;
 
             Camera cam = worldCamera != null ? worldCamera : Camera.main;
@@ -187,10 +216,51 @@ namespace ProjectX.ArcadeBasketball
             Vector3 screen = cam.WorldToScreenPoint(worldPos);
             Vector2 local;
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    _canvasRect, screen, null, out local))
+                    root, screen, null, out local))
                 return Vector2.zero;
 
+            return ClampToSafe(local, 70f, 8f);
+        }
+
+        Vector2 ClampToSafe(Vector2 local, float headroomAbove, float headroomBelow)
+        {
+            RectTransform root = _safeRect != null ? _safeRect : _canvasRect;
+            if (root == null)
+                return local;
+
+            Rect rect = root.rect;
+            const float MarginX = 80f;
+            const float MarginY = 48f;
+            local.x = Mathf.Clamp(local.x, rect.xMin + MarginX, rect.xMax - MarginX);
+
+            float minY = rect.yMin + MarginY + headroomBelow;
+            float maxY = rect.yMax - MarginY - headroomAbove;
+            if (minY > maxY)
+                local.y = (rect.yMin + rect.yMax) * 0.5f;
+            else
+                local.y = Mathf.Clamp(local.y, minY, maxY);
+
             return local;
+        }
+
+        TMP_FontAsset ResolveFont(TMP_FontAsset assigned)
+        {
+            if (assigned != null)
+                return assigned;
+            if (hudFont != null)
+                return hudFont;
+            if (popupFont != null)
+                return popupFont;
+            return TMP_Settings.defaultFontAsset;
+        }
+
+        static void ApplyFont(TextMeshProUGUI label, TMP_FontAsset font)
+        {
+            if (label == null || font == null)
+                return;
+            label.font = font;
+            if (font.material != null)
+                label.fontSharedMaterial = font.material;
         }
     }
 }
