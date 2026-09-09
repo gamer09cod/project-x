@@ -60,6 +60,15 @@ namespace ProjectX.ArcadeBasketball
         float _steeringSuppressedUntil;
         Vector2 _velocityBeforePhysics;
         bool _floorImpactArmed = true;
+        CircleCollider2D _circle;
+        Collider2D _ballCollider;
+        Collider2D _groundCollider;
+        float _ballRadius = 0.3f;
+        float _leftExit;
+        float _rightExit;
+        float _enterFromRight;
+        float _enterFromLeft;
+        bool _hasWrapBounds;
 
         void Awake()
         {
@@ -83,6 +92,14 @@ namespace ProjectX.ArcadeBasketball
                 Debug.LogError("[ArcadeBasketball] TapInputController is not assigned.", this);
 
             BasketballGameplayConfig.TryGet(gameplayConfig, this, out gameplayConfig);
+
+            _circle = GetComponent<CircleCollider2D>();
+            _ballCollider = _circle != null ? (Collider2D)_circle : GetComponent<Collider2D>();
+            CacheBallRadius();
+
+            CourtGroundMarker ground = FindFirstObjectByType<CourtGroundMarker>();
+            if (ground != null)
+                _groundCollider = ground.GetComponent<Collider2D>();
 
             if (targetHoop == null)
                 Debug.LogError("[ArcadeBasketball] Target hoop is not assigned. Call SetTargetHoop.", this);
@@ -169,13 +186,13 @@ namespace ProjectX.ArcadeBasketball
             if (_pendingTap)
                 return;
 
-            if (!BasketballGameplayConfig.TryGet(gameplayConfig, this, out BasketballGameplayConfig config))
+            if (gameplayConfig == null)
                 return;
 
             if (Time.time < _nextTapTime)
                 return;
 
-            _nextTapTime = Time.time + config.tapCooldown;
+            _nextTapTime = Time.time + gameplayConfig.tapCooldown;
             _pendingTap = true;
             OnTapApplied?.Invoke();
         }
@@ -189,8 +206,7 @@ namespace ProjectX.ArcadeBasketball
 
         void IgnoreSideBoundaries()
         {
-            Collider2D ballCollider = GetComponent<Collider2D>();
-            if (ballCollider == null)
+            if (_ballCollider == null)
                 return;
 
             if (leftBoundary == null)
@@ -208,9 +224,27 @@ namespace ProjectX.ArcadeBasketball
             }
 
             if (leftBoundary != null)
-                Physics2D.IgnoreCollision(ballCollider, leftBoundary);
+                Physics2D.IgnoreCollision(_ballCollider, leftBoundary);
             if (rightBoundary != null)
-                Physics2D.IgnoreCollision(ballCollider, rightBoundary);
+                Physics2D.IgnoreCollision(_ballCollider, rightBoundary);
+
+            CacheWrapBounds();
+        }
+
+        void CacheWrapBounds()
+        {
+            if (leftBoundary == null || rightBoundary == null)
+            {
+                _hasWrapBounds = false;
+                return;
+            }
+
+            float radius = GetBallRadius();
+            _leftExit = leftBoundary.bounds.min.x;
+            _rightExit = rightBoundary.bounds.max.x;
+            _enterFromRight = rightBoundary.bounds.min.x - radius;
+            _enterFromLeft = leftBoundary.bounds.max.x + radius;
+            _hasWrapBounds = true;
         }
 
         void FixedUpdate()
@@ -227,24 +261,24 @@ namespace ProjectX.ArcadeBasketball
             if (!_body.simulated)
                 return;
 
-            if (!BasketballGameplayConfig.TryGet(gameplayConfig, this, out BasketballGameplayConfig config))
+            if (gameplayConfig == null)
                 return;
 
-            if (_body.position.y < config.outOfBoundsY)
+            if (_body.position.y < gameplayConfig.outOfBoundsY)
             {
-                BeginRecovery(config);
+                BeginRecovery(gameplayConfig);
                 return;
             }
 
             float dt = Time.fixedDeltaTime;
             Vector2 velocity = _body.linearVelocity;
 
-            ApplyGravityAndTap(ref velocity, config, dt);
+            ApplyGravityAndTap(ref velocity, gameplayConfig, dt);
 
             _body.linearVelocity = velocity;
             _velocityBeforePhysics = velocity;
 
-            WrapIfPastSideBoundaries(config);
+            WrapIfPastSideBoundaries(gameplayConfig);
         }
 
         void LateUpdate()
@@ -257,15 +291,13 @@ namespace ProjectX.ArcadeBasketball
             if (visual == null || _body == null || !_body.simulated)
                 return;
 
-            if (!BasketballGameplayConfig.TryGet(gameplayConfig, this, out BasketballGameplayConfig config))
+            if (gameplayConfig == null)
                 return;
 
             float radius = GetBallRadius();
-            if (radius < 0.05f)
-                radius = 0.3f;
 
             // Roll like a wheel: angle = -distance / radius. Sign: +X → clockwise in 2D.
-            float degrees = -_body.linearVelocity.x / radius * config.spinMultiplier * Mathf.Rad2Deg
+            float degrees = -_body.linearVelocity.x / radius * gameplayConfig.spinMultiplier * Mathf.Rad2Deg
                 * Time.deltaTime;
             visual.Rotate(0f, 0f, degrees, Space.Self);
         }
@@ -278,13 +310,12 @@ namespace ProjectX.ArcadeBasketball
             float enterFromRight;
             float enterFromLeft;
 
-            if (leftBoundary != null && rightBoundary != null)
+            if (_hasWrapBounds)
             {
-                leftExit = leftBoundary.bounds.min.x;
-                rightExit = rightBoundary.bounds.max.x;
-                float radius = GetBallRadius();
-                enterFromRight = rightBoundary.bounds.min.x - radius;
-                enterFromLeft = leftBoundary.bounds.max.x + radius;
+                leftExit = _leftExit;
+                rightExit = _rightExit;
+                enterFromRight = _enterFromRight;
+                enterFromLeft = _enterFromLeft;
             }
             else
             {
@@ -304,14 +335,23 @@ namespace ProjectX.ArcadeBasketball
             _body.position = position;
         }
 
-        float GetBallRadius()
+        void CacheBallRadius()
         {
-            CircleCollider2D circle = GetComponent<CircleCollider2D>();
-            if (circle == null)
-                return 0f;
+            if (_circle == null)
+            {
+                _ballRadius = 0.3f;
+                return;
+            }
 
             float scale = Mathf.Max(Mathf.Abs(transform.lossyScale.x), Mathf.Abs(transform.lossyScale.y));
-            return circle.radius * scale;
+            _ballRadius = _circle.radius * scale;
+            if (_ballRadius < 0.05f)
+                _ballRadius = 0.3f;
+        }
+
+        float GetBallRadius()
+        {
+            return _ballRadius;
         }
 
         void BeginRecovery(BasketballGameplayConfig config)
@@ -415,7 +455,7 @@ namespace ProjectX.ArcadeBasketball
             if (_isRecovering || collision.collider == null)
                 return;
 
-            if (collision.collider.GetComponent<CourtGroundMarker>() != null)
+            if (IsGround(collision.collider))
             {
                 _grounded = true;
                 _floorImpactArmed = false;
@@ -424,8 +464,8 @@ namespace ProjectX.ArcadeBasketball
                 return;
             }
 
-            HoopSolidMarker solid = collision.collider.GetComponent<HoopSolidMarker>();
-            if (solid == null)
+            HoopSolidMarker solid;
+            if (!collision.collider.TryGetComponent(out solid))
                 return;
 
             if (solid.Kind == HoopSolidKind.Backboard)
@@ -435,17 +475,17 @@ namespace ProjectX.ArcadeBasketball
 
             OnHoopSolidHit?.Invoke(solid.Kind);
 
-            if (!BasketballGameplayConfig.TryGet(gameplayConfig, this, out BasketballGameplayConfig config))
+            if (!gameplayConfig)
                 return;
 
             float impactSpeed = Mathf.Max(
                 _body != null ? _body.linearVelocity.magnitude : 0f,
                 collision.relativeVelocity.magnitude);
-            if (impactSpeed < config.minimumCollisionSpeedForSuppression)
+            if (impactSpeed < gameplayConfig.minimumCollisionSpeedForSuppression)
                 return;
 
             // Refresh, do not stack — another hit extends from now, not from leftover time.
-            _steeringSuppressedUntil = Time.time + config.collisionSteeringDuration;
+            _steeringSuppressedUntil = Time.time + gameplayConfig.collisionSteeringDuration;
         }
 
         void ApplyGroundBounce()
@@ -453,14 +493,14 @@ namespace ProjectX.ArcadeBasketball
             if (_body == null)
                 return;
 
-            if (!BasketballGameplayConfig.TryGet(gameplayConfig, this, out BasketballGameplayConfig config))
+            if (gameplayConfig == null)
                 return;
 
             float incomingDown = Mathf.Max(0f, -_velocityBeforePhysics.y);
             Vector2 velocity = _body.linearVelocity;
-            bool playSfx = incomingDown >= config.groundSfxMinIncoming;
+            bool playSfx = incomingDown >= gameplayConfig.groundSfxMinIncoming;
 
-            if (incomingDown < config.groundRestSpeed)
+            if (incomingDown < gameplayConfig.groundRestSpeed)
             {
                 velocity.y = 0f;
                 _body.linearVelocity = velocity;
@@ -470,8 +510,8 @@ namespace ProjectX.ArcadeBasketball
                 return;
             }
 
-            float bounceY = Mathf.Min(incomingDown * config.groundBounciness, config.maxBounceSpeed);
-            if (bounceY < config.groundRestSpeed)
+            float bounceY = Mathf.Min(incomingDown * gameplayConfig.groundBounciness, gameplayConfig.maxBounceSpeed);
+            if (bounceY < gameplayConfig.groundRestSpeed)
                 bounceY = 0f;
 
             velocity.y = bounceY;
@@ -486,19 +526,19 @@ namespace ProjectX.ArcadeBasketball
             if (_isRecovering)
                 return;
 
-            if (collision.collider == null || collision.collider.GetComponent<CourtGroundMarker>() == null)
+            if (!IsGround(collision.collider))
                 return;
 
             _grounded = true;
             OnGroundHit?.Invoke();
 
-            if (!BasketballGameplayConfig.TryGet(gameplayConfig, this, out BasketballGameplayConfig config))
+            if (gameplayConfig == null)
                 return;
 
-            if (_body != null && _body.linearVelocity.y > config.floorStayReArmY)
+            if (_body != null && _body.linearVelocity.y > gameplayConfig.floorStayReArmY)
                 _floorImpactArmed = true;
 
-            if (_floorImpactArmed && _velocityBeforePhysics.y < -config.groundSfxMinIncoming)
+            if (_floorImpactArmed && _velocityBeforePhysics.y < -gameplayConfig.groundSfxMinIncoming)
             {
                 _floorImpactArmed = false;
                 ApplyGroundBounce();
@@ -507,11 +547,16 @@ namespace ProjectX.ArcadeBasketball
 
         void OnCollisionExit2D(Collision2D collision)
         {
-            if (collision.collider != null && collision.collider.GetComponent<CourtGroundMarker>() != null)
+            if (IsGround(collision.collider))
             {
                 _grounded = false;
                 _floorImpactArmed = true;
             }
+        }
+
+        bool IsGround(Collider2D collider)
+        {
+            return collider != null && _groundCollider != null && collider == _groundCollider;
         }
 
 #if UNITY_EDITOR

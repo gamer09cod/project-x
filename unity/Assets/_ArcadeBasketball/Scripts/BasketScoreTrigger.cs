@@ -43,7 +43,9 @@ namespace ProjectX.ArcadeBasketball
 
         bool IsBall(Collider2D other)
         {
-            return other != null && other.GetComponent<BasketballArcadeController>() != null;
+            return other != null
+                && _detector != null
+                && other.attachedRigidbody == _detector.BallBody;
         }
     }
 }

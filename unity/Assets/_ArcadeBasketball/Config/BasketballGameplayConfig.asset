@@ -12,23 +12,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c8f3a1b24d5e6f708192a3b4c5d6e7f8, type: 3}
   m_Name: BasketballGameplayConfig
   m_EditorClassIdentifier: ProjectX.ArcadeBasketball.BasketballGameplayConfig
-  tapVelocity: 6
-  tapCooldown: 0.075
-  maxUpwardVelocity: 6
-  horizontalSpeed: 2
+  tapVelocity: 6.4
+  tapCooldown: 0.1
+  maxUpwardVelocity: 6.4
+  horizontalSpeed: 2.6
   horizontalArriveDistance: 1.25
   horizontalAcceleration: 20
-  gravityMultiplier: 1.75
-  maxFallSpeed: 14
-  groundBounciness: 0.62
-  maxBounceSpeed: 8.5
-  groundRestSpeed: 3.5
-  groundDrag: 1
+  gravityMultiplier: 1.8
+  maxFallSpeed: 12
+  groundBounciness: 0.55
+  maxBounceSpeed: 7.5
+  groundRestSpeed: 3.2
+  groundDrag: 2
   groundStopSpeed: 0.05
   groundSfxMinIncoming: 0.75
   floorStayReArmY: 0.25
-  collisionSteeringMultiplier: 0.25
-  collisionSteeringDuration: 0.12
+  collisionSteeringMultiplier: 0.3
+  collisionSteeringDuration: 0.16
   minimumCollisionSpeedForSuppression: 0.5
   hoopSolidSfxCooldown: 0.08
   outOfBoundsY: -6.5

@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1c2d3e4f5a6b708192a3b4c5d6e7f809, type: 3}
   m_Name: HoopGameplayConfig
   m_EditorClassIdentifier: ProjectX.ArcadeBasketball.HoopGameplayConfig
-  moveDuration: 0.3
-  enterDistance: 3.5
+  moveDuration: 0.28
+  enterDistance: 3.2
   netSettleDuration: 0.45
   netStretch: 0.22
   netSquash: 0.1

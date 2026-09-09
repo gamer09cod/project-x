@@ -28,9 +28,12 @@ namespace ProjectX.ArcadeBasketball
         RectTransform _canvasRect;
         RectTransform _safeRect;
         TextMeshProUGUI _hud;
+        TextMeshProUGUI _timer;
         Vector3 _hudRestScale = Vector3.one;
         float _hudBump;
+        int _shownTimer = int.MinValue;
         readonly List<ArcadeScorePopup> _free = new List<ArcadeScorePopup>(PoolSize);
+        readonly List<ArcadeScorePopup> _all = new List<ArcadeScorePopup>(PoolSize);
 
         void Awake()
         {
@@ -57,7 +60,21 @@ namespace ProjectX.ArcadeBasketball
         public void ResetRound()
         {
             SetHud(0);
+            SetTimer(0f);
             StopAll();
+        }
+
+        public void SetTimer(float remainingSeconds)
+        {
+            if (_timer == null)
+                return;
+
+            int seconds = Mathf.CeilToInt(Mathf.Max(0f, remainingSeconds));
+            if (seconds == _shownTimer)
+                return;
+
+            _shownTimer = seconds;
+            _timer.text = seconds.ToString();
         }
 
         static readonly Color PointsColor = Color.white;
@@ -105,11 +122,10 @@ namespace ProjectX.ArcadeBasketball
 
         public void StopAll()
         {
-            ArcadeScorePopup[] popups = GetComponentsInChildren<ArcadeScorePopup>(true);
-            for (int i = 0; i < popups.Length; i++)
+            for (int i = 0; i < _all.Count; i++)
             {
-                if (popups[i] != null)
-                    popups[i].Stop();
+                if (_all[i] != null)
+                    _all[i].Stop();
             }
         }
 
@@ -136,26 +152,51 @@ namespace ProjectX.ArcadeBasketball
             _canvasRect = canvasGo.GetComponent<RectTransform>();
             _safeRect = CreateSafeArea(canvasGo.transform);
 
-            var hudGo = new GameObject("ScoreHud", typeof(RectTransform), typeof(TextMeshProUGUI));
-            hudGo.transform.SetParent(canvasGo.transform, false);
-            RectTransform hudRect = hudGo.GetComponent<RectTransform>();
-            hudRect.anchorMin = new Vector2(0.5f, 1f);
-            hudRect.anchorMax = new Vector2(0.5f, 1f);
-            hudRect.pivot = new Vector2(0.5f, 1f);
-            hudRect.anchoredPosition = new Vector2(0f, -36f);
-            hudRect.sizeDelta = new Vector2(280f, 96f);
+            var rootGo = new GameObject("HudRoot", typeof(RectTransform));
+            rootGo.transform.SetParent(canvasGo.transform, false);
+            RectTransform root = rootGo.GetComponent<RectTransform>();
+            root.anchorMin = new Vector2(0.5f, 1f);
+            root.anchorMax = new Vector2(0.5f, 1f);
+            root.pivot = new Vector2(0.5f, 1f);
+            root.anchoredPosition = new Vector2(0f, -36f);
+            root.sizeDelta = new Vector2(620f, 300f);
 
-            HudSafeInset inset = hudGo.AddComponent<HudSafeInset>();
+            HudSafeInset inset = rootGo.AddComponent<HudSafeInset>();
             inset.extraPadding = new Vector2(12f, 16f);
 
-            _hud = hudGo.GetComponent<TextMeshProUGUI>();
-            ApplyFont(_hud, ResolveFont(hudFont));
-            _hud.alignment = TextAlignmentOptions.Center;
-            _hud.fontSize = 64f;
-            _hud.color = Color.white;
-            _hud.raycastTarget = false;
+            TMP_FontAsset font = ResolveFont(hudFont);
+            _hud = CreateHudLabel(root, "ScoreHud", new Vector2(0f, 0f), new Vector2(620f, 180f), 140f, font);
             _hud.text = "0";
-            _hudRestScale = hudRect.localScale;
+            _hudRestScale = _hud.rectTransform.localScale;
+
+            _timer = CreateHudLabel(root, "TimerHud", new Vector2(0f, -1065f), new Vector2(400f, 100f), 72f, font);
+            _timer.text = "0";
+        }
+
+        static TextMeshProUGUI CreateHudLabel(
+            Transform parent,
+            string name,
+            Vector2 anchoredPosition,
+            Vector2 size,
+            float fontSize,
+            TMP_FontAsset font)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(parent, false);
+            RectTransform rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = size;
+
+            TextMeshProUGUI label = go.GetComponent<TextMeshProUGUI>();
+            ApplyFont(label, font);
+            label.alignment = TextAlignmentOptions.Center;
+            label.fontSize = fontSize;
+            label.color = Color.white;
+            label.raycastTarget = false;
+            return label;
         }
 
         ArcadeScorePopup CreatePopup(int index, TMP_FontAsset font)
@@ -168,6 +209,7 @@ namespace ProjectX.ArcadeBasketball
             go.transform.SetParent(popupParent, false);
             ArcadeScorePopup popup = go.AddComponent<ArcadeScorePopup>();
             popup.Init(font, Release);
+            _all.Add(popup);
             return popup;
         }
 

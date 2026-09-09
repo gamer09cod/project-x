@@ -62,22 +62,22 @@ namespace ProjectX.ArcadeBasketball
             if (_useAnimator || _elapsed < 0f)
                 return;
 
-            if (!HoopGameplayConfig.TryGet(hoopConfig, this, out HoopGameplayConfig config))
+            if (hoopConfig == null)
                 return;
 
             _elapsed += Time.deltaTime;
-            if (_elapsed >= config.netSettleDuration)
+            if (_elapsed >= hoopConfig.netSettleDuration)
             {
                 _elapsed = -1f;
                 transform.localScale = _restScale;
                 return;
             }
 
-            float t = _elapsed / config.netSettleDuration;
+            float t = _elapsed / hoopConfig.netSettleDuration;
             float decay = 1f - t;
             float wave = Mathf.Sin(t * Mathf.PI * 3f) * decay * decay;
-            float stretchY = 1f + wave * config.netStretch * _intensity;
-            float squashX = 1f - wave * config.netSquash * _intensity;
+            float stretchY = 1f + wave * hoopConfig.netStretch * _intensity;
+            float squashX = 1f - wave * hoopConfig.netSquash * _intensity;
             transform.localScale = new Vector3(
                 _restScale.x * squashX,
                 _restScale.y * stretchY,

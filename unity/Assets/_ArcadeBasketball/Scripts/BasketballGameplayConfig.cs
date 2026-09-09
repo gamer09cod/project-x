@@ -13,17 +13,17 @@ namespace ProjectX.ArcadeBasketball
     {
         [Header("Tap")]
         [Tooltip("Y velocity set on each accepted tap. Sets Y; does not AddForce.")]
-        public float tapVelocity = 6f;
+        public float tapVelocity = 6.4f;
 
         [Tooltip("Seconds between accepted taps.")]
-        public float tapCooldown = 0.075f;
+        public float tapCooldown = 0.1f;
 
         [Tooltip("Hard cap on upward velocity. Default matches tapVelocity.")]
-        public float maxUpwardVelocity = 6f;
+        public float maxUpwardVelocity = 6.4f;
 
         [Header("Horizontal")]
         [Tooltip("X speed on tap toward the hoop's side of the court. Full value even at the rim so the ball can pass through.")]
-        public float horizontalSpeed = 2f;
+        public float horizontalSpeed = 2.6f;
 
         [Tooltip("Unused. Tap X stays at horizontalSpeed so the ball can pass HoopTarget.")]
         public float horizontalArriveDistance = 1.25f;
@@ -33,19 +33,19 @@ namespace ProjectX.ArcadeBasketball
 
         [Header("Fall")]
         [Tooltip("Fall acceleration as a multiple of Physics2D.gravity. 1 = default gravity. Does not change the project gravity vector.")]
-        public float gravityMultiplier = 1.75f;
+        public float gravityMultiplier = 1.8f;
 
         [Tooltip("Clamp on downward speed (positive). High enough that taller falls still hit harder.")]
-        public float maxFallSpeed = 14f;
+        public float maxFallSpeed = 12f;
 
         [Tooltip("Outbound Y after a floor hit, as a fraction of inbound fall speed.")]
-        public float groundBounciness = 0.62f;
+        public float groundBounciness = 0.55f;
 
         [Tooltip("Cap on bounce-up speed after a floor hit. Independent of tap cap.")]
-        public float maxBounceSpeed = 8.5f;
+        public float maxBounceSpeed = 7.5f;
 
         [Tooltip("Landings slower than this (positive) settle instead of bouncing.")]
-        public float groundRestSpeed = 3.5f;
+        public float groundRestSpeed = 3.2f;
 
         [Tooltip("Rolling slowdown on the floor (units/s²). ~2 lets it roll a beat then settle. Air X still coasts.")]
         public float groundDrag = 2f;
@@ -61,10 +61,10 @@ namespace ProjectX.ArcadeBasketball
 
         [Header("Collision steering")]
         [Tooltip("Blend toward hoop X on tap after a rim/backboard hit. 1 = full tap X, 0.25 keeps most of the bounce.")]
-        public float collisionSteeringMultiplier = 0.25f;
+        public float collisionSteeringMultiplier = 0.3f;
 
         [Tooltip("Seconds to keep reduced steering after a hit. Refresh on repeat hits.")]
-        public float collisionSteeringDuration = 0.12f;
+        public float collisionSteeringDuration = 0.16f;
 
         [Tooltip("Ignore glancing hits below this |linearVelocity| for steering suppression.")]
         public float minimumCollisionSpeedForSuppression = 0.5f;

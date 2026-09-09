@@ -9,10 +9,10 @@ namespace ProjectX.ArcadeBasketball
     {
         [Header("Relocation")]
         [Tooltip("Seconds to slide in from off-screen.")]
-        public float moveDuration = 0.3f;
+        public float moveDuration = 0.28f;
 
         [Tooltip("How far off-screen the hoop starts, past the destination anchor.")]
-        public float enterDistance = 3.5f;
+        public float enterDistance = 3.2f;
 
         [Header("Net (fallback ripple if Animator is missing)")]
         [Tooltip("Seconds for the procedural squash/stretch.")]

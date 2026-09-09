@@ -29,9 +29,12 @@ namespace ProjectX.ArcadeBasketball
 
         public bool ScoringLocked { get; private set; }
 
+        public Rigidbody2D BallBody => ballBody;
+
         CycleState _state;
         bool _inUpper;
         bool _inLower;
+        BasketballArcadeController _arcade;
 
         void Awake()
         {
@@ -39,11 +42,16 @@ namespace ProjectX.ArcadeBasketball
             {
                 BasketballArcadeController ball = FindFirstObjectByType<BasketballArcadeController>();
                 if (ball != null)
+                {
+                    _arcade = ball;
                     ballBody = ball.GetComponent<Rigidbody2D>();
+                }
             }
 
             if (ballBody == null)
                 Debug.LogError("[ArcadeBasketball] BasketScoreDetector has no ball Rigidbody2D.", this);
+            else if (_arcade == null)
+                _arcade = ballBody.GetComponent<BasketballArcadeController>();
         }
 
         void OnDisable()
@@ -71,12 +79,8 @@ namespace ProjectX.ArcadeBasketball
         {
             CycleId++;
             _state = CycleState.Ready;
-            if (ballBody != null)
-            {
-                BasketballArcadeController arcade = ballBody.GetComponent<BasketballArcadeController>();
-                if (arcade != null)
-                    arcade.ClearShotContact();
-            }
+            if (_arcade != null)
+                _arcade.ClearShotContact();
         }
 
         void FixedUpdate()
@@ -113,12 +117,8 @@ namespace ProjectX.ArcadeBasketball
 
             _state = CycleState.Scored;
             ArcadeShotQuality quality = ArcadeShotQuality.Perfect;
-            if (ballBody != null)
-            {
-                BasketballArcadeController arcade = ballBody.GetComponent<BasketballArcadeController>();
-                if (arcade != null)
-                    quality = arcade.ClassifyShot();
-            }
+            if (_arcade != null)
+                quality = _arcade.ClassifyShot();
 
             if (logScores)
                 Debug.Log($"[ArcadeBasketball] basket scored quality={quality}", this);

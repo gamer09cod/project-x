@@ -33,6 +33,8 @@ namespace ProjectX.ArcadeBasketball
         [SerializeField]
         HoopGameplayConfig hoopConfig;
 
+        ArcadeRoundController _round;
+
         bool _atLeft = true;
         bool _pendingRelocation;
         bool _relocating;
@@ -50,6 +52,8 @@ namespace ProjectX.ArcadeBasketball
                 Debug.LogError("[ArcadeBasketball] HoopArcadeController needs BasketScoreDetector.", this);
             if (ball == null)
                 ball = FindFirstObjectByType<BasketballArcadeController>();
+
+            _round = GetComponent<ArcadeRoundController>();
 
             HoopGameplayConfig.TryGet(hoopConfig, this, out hoopConfig);
         }
@@ -185,7 +189,7 @@ namespace ProjectX.ArcadeBasketball
             if (scoreDetector == null)
                 return;
 
-            ArcadeRoundController round = GetComponent<ArcadeRoundController>();
+            ArcadeRoundController round = _round;
             bool allowScore = !_pendingRelocation && !_relocating
                 && (round == null
                     || (round.State == ArcadeRoundState.Playing && !round.IsPaused));

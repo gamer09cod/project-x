@@ -259,9 +259,9 @@ namespace ProjectX.ArcadeBasketball
             float now = Time.unscaledTime;
             if (now < _nextCollisionSfxTime)
                 return false;
-            if (!BasketballGameplayConfig.TryGet(gameplayConfig, this, out BasketballGameplayConfig config))
+            if (gameplayConfig == null)
                 return false;
-            _nextCollisionSfxTime = now + Mathf.Max(0f, config.hoopSolidSfxCooldown);
+            _nextCollisionSfxTime = now + Mathf.Max(0f, gameplayConfig.hoopSolidSfxCooldown);
             return true;
         }
 

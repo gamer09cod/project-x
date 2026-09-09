@@ -127,7 +127,10 @@ namespace ProjectX.ArcadeBasketball
 #endif
 
             if (IsPaused)
+            {
+                PushTimer();
                 return;
+            }
 
             switch (State)
             {
@@ -141,6 +144,8 @@ namespace ProjectX.ArcadeBasketball
                     TickRoundEnding();
                     break;
             }
+
+            PushTimer();
         }
 
         public void BeginRound()
@@ -162,10 +167,19 @@ namespace ProjectX.ArcadeBasketball
             if (ball != null)
                 ball.ClearShotContact();
             if (scoreFeedback != null)
+            {
                 scoreFeedback.ResetRound();
+                scoreFeedback.SetTimer(RemainingSeconds);
+            }
 
             State = ArcadeRoundState.Ready;
             EnterCountdown();
+        }
+
+        void PushTimer()
+        {
+            if (scoreFeedback != null)
+                scoreFeedback.SetTimer(RemainingSeconds);
         }
 
         public void SetPaused(bool paused)
@@ -263,9 +277,8 @@ namespace ProjectX.ArcadeBasketball
                 return;
 
             int points = 1;
-            if (ball != null
-                && BasketballGameplayConfig.TryGet(ball.GameplayConfig, this, out BasketballGameplayConfig config))
-                points = config.PointsFor(quality);
+            if (ball != null && ball.GameplayConfig != null)
+                points = ball.GameplayConfig.PointsFor(quality);
 
             Score += points;
             if (scoreFeedback != null)

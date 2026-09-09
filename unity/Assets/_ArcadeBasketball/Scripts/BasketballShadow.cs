@@ -22,6 +22,7 @@ namespace ProjectX.ArcadeBasketball
 
         Vector3 _restScale;
         float _ballRadius = 0.3f;
+        float _groundY;
 
         void Awake()
         {
@@ -52,6 +53,9 @@ namespace ProjectX.ArcadeBasketball
             _restScale = ComputeRestScale();
 
             BasketballGameplayConfig.TryGet(gameplayConfig, this, out gameplayConfig);
+
+            if (ground != null)
+                _groundY = ground.bounds.max.y;
         }
 
         Vector3 ComputeRestScale()
@@ -70,26 +74,26 @@ namespace ProjectX.ArcadeBasketball
             if (ball == null)
                 return;
 
-            float groundY = ground != null ? ground.bounds.max.y : transform.position.y;
+            float groundY = ground != null ? _groundY : transform.position.y;
             Vector3 ballPos = ball.position;
             transform.position = new Vector3(ballPos.x, groundY, ballPos.z);
 
-            if (!BasketballGameplayConfig.TryGet(gameplayConfig, this, out BasketballGameplayConfig config))
+            if (gameplayConfig == null)
                 return;
 
             float height = Mathf.Max(0f, ballPos.y - groundY - _ballRadius);
-            float t = config.shadowFadeHeight > 0f
-                ? Mathf.Clamp01(height / config.shadowFadeHeight)
+            float t = gameplayConfig.shadowFadeHeight > 0f
+                ? Mathf.Clamp01(height / gameplayConfig.shadowFadeHeight)
                 : 0f;
 
-            float scaleMul = Mathf.Lerp(1f, config.shadowMinScale, t);
+            float scaleMul = Mathf.Lerp(1f, gameplayConfig.shadowMinScale, t);
             transform.localScale = new Vector3(_restScale.x * scaleMul, _restScale.y * scaleMul, 1f);
 
             if (sprite == null)
                 return;
 
             Color color = sprite.color;
-            color.a = Mathf.Lerp(config.shadowMaxAlpha, config.shadowMinAlpha, t);
+            color.a = Mathf.Lerp(gameplayConfig.shadowMaxAlpha, gameplayConfig.shadowMinAlpha, t);
             sprite.color = color;
         }
     }
