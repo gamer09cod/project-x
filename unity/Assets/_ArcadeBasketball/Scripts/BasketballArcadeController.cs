@@ -35,16 +35,29 @@ namespace ProjectX.ArcadeBasketball
         /// <summary>Ball contacted the court floor (WallBottom). Also fires on Stay.</summary>
         public event Action OnGroundHit;
 
+        /// <summary>Ball came to rest on the floor (not a bounce). Shot-log miss.</summary>
+        public event Action OnGroundSettled;
+
+        /// <summary>OOB snap-back finished. Shot-log miss if the possession was live.</summary>
+        public event Action OnRecovered;
+
         /// <summary>Tap was accepted and will apply lift this physics step.</summary>
         public event Action OnTapApplied;
 
-        /// <summary>Floor bounce with outbound Y (not a settle). Collision SFX.</summary>
-        public event Action OnGroundBounce;
+        /// <summary>Floor bounce with outbound Y (not a settle). Arg is inbound fall speed.</summary>
+        public event Action<float> OnGroundBounce;
 
-        /// <summary>Ball struck rim or backboard this Enter. Collision SFX.</summary>
-        public event Action<HoopSolidKind> OnHoopSolidHit;
+        /// <summary>Ball struck rim or backboard this Enter. Arg is impact speed.</summary>
+        public event Action<HoopSolidKind, float> OnHoopSolidHit;
 
         public BasketballGameplayConfig GameplayConfig => gameplayConfig;
+
+        public bool IsGrounded => _grounded;
+
+        public bool IsRecovering => _isRecovering;
+
+        public bool IsInAir =>
+            _body != null && _body.simulated && !_grounded && !_isRecovering;
 
         bool _hitRim;
         bool _hitBackboard;
@@ -60,6 +73,7 @@ namespace ProjectX.ArcadeBasketball
         float _steeringSuppressedUntil;
         Vector2 _velocityBeforePhysics;
         bool _floorImpactArmed = true;
+        bool _floorSettled;
         CircleCollider2D _circle;
         Collider2D _ballCollider;
         Collider2D _groundCollider;
@@ -132,6 +146,7 @@ namespace ProjectX.ArcadeBasketball
             _grounded = false;
             _steeringSuppressedUntil = 0f;
             _floorImpactArmed = true;
+            _floorSettled = false;
         }
 
         public void ClearShotContact()
@@ -160,6 +175,7 @@ namespace ProjectX.ArcadeBasketball
             _steeringSuppressedUntil = 0f;
             _grounded = false;
             _floorImpactArmed = true;
+            _floorSettled = false;
             ClearShotContact();
             FreezeBody();
             _body.position = _safeSpawnPosition;
@@ -173,6 +189,7 @@ namespace ProjectX.ArcadeBasketball
             _steeringSuppressedUntil = 0f;
             _grounded = false;
             _floorImpactArmed = true;
+            _floorSettled = false;
             ClearShotContact();
             if (_body != null)
                 FreezeBody();
@@ -279,6 +296,7 @@ namespace ProjectX.ArcadeBasketball
             _velocityBeforePhysics = velocity;
 
             WrapIfPastSideBoundaries(gameplayConfig);
+            NotifyIfFloorSettled();
         }
 
         void LateUpdate()
@@ -392,7 +410,9 @@ namespace ProjectX.ArcadeBasketball
             _isRecovering = false;
             _grounded = false;
             _floorImpactArmed = true;
+            _floorSettled = false;
             ClearShotContact();
+            OnRecovered?.Invoke();
         }
 
         void FreezeBody()
@@ -473,14 +493,14 @@ namespace ProjectX.ArcadeBasketball
             else
                 _hitRim = true;
 
-            OnHoopSolidHit?.Invoke(solid.Kind);
+            float impactSpeed = Mathf.Max(
+                _body != null ? _body.linearVelocity.magnitude : 0f,
+                collision.relativeVelocity.magnitude);
+            OnHoopSolidHit?.Invoke(solid.Kind, impactSpeed);
 
             if (!gameplayConfig)
                 return;
 
-            float impactSpeed = Mathf.Max(
-                _body != null ? _body.linearVelocity.magnitude : 0f,
-                collision.relativeVelocity.magnitude);
             if (impactSpeed < gameplayConfig.minimumCollisionSpeedForSuppression)
                 return;
 
@@ -506,7 +526,8 @@ namespace ProjectX.ArcadeBasketball
                 _body.linearVelocity = velocity;
                 _velocityBeforePhysics = velocity;
                 if (playSfx)
-                    OnGroundBounce?.Invoke();
+                    OnGroundBounce?.Invoke(incomingDown);
+                NotifyIfFloorSettled();
                 return;
             }
 
@@ -518,7 +539,9 @@ namespace ProjectX.ArcadeBasketball
             _body.linearVelocity = velocity;
             _velocityBeforePhysics = velocity;
             if (playSfx)
-                OnGroundBounce?.Invoke();
+                OnGroundBounce?.Invoke(incomingDown);
+
+            NotifyIfFloorSettled();
         }
 
         void OnCollisionStay2D(Collision2D collision)
@@ -543,6 +566,8 @@ namespace ProjectX.ArcadeBasketball
                 _floorImpactArmed = false;
                 ApplyGroundBounce();
             }
+
+            NotifyIfFloorSettled();
         }
 
         void OnCollisionExit2D(Collision2D collision)
@@ -551,7 +576,33 @@ namespace ProjectX.ArcadeBasketball
             {
                 _grounded = false;
                 _floorImpactArmed = true;
+                _floorSettled = false;
             }
+        }
+
+        void NotifyIfFloorSettled()
+        {
+            if (!_grounded || _isRecovering || _body == null || gameplayConfig == null)
+            {
+                _floorSettled = false;
+                return;
+            }
+
+            Vector2 velocity = _body.linearVelocity;
+            bool rest = Mathf.Abs(velocity.x) < gameplayConfig.groundStopSpeed
+                && velocity.y < gameplayConfig.groundRestSpeed
+                && velocity.y > -gameplayConfig.groundRestSpeed;
+            if (!rest)
+            {
+                _floorSettled = false;
+                return;
+            }
+
+            if (_floorSettled)
+                return;
+
+            _floorSettled = true;
+            OnGroundSettled?.Invoke();
         }
 
         bool IsGround(Collider2D collider)

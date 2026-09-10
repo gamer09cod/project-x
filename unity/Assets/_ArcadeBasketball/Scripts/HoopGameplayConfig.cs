@@ -14,6 +14,15 @@ namespace ProjectX.ArcadeBasketball
         [Tooltip("How far off-screen the hoop starts, past the destination anchor.")]
         public float enterDistance = 3.2f;
 
+        [Tooltip("World Y at round start. Relocates then roll between hoopYMin and hoopYMax.")]
+        public float hoopYStart = 0.3f;
+
+        [Tooltip("Lowest world Y for the hoop rest after a relocate.")]
+        public float hoopYMin = 0.3f;
+
+        [Tooltip("Highest world Y for the hoop rest. X stays on the L/R anchors.")]
+        public float hoopYMax = 1f;
+
         [Header("Net (fallback ripple if Animator is missing)")]
         [Tooltip("Seconds for the procedural squash/stretch.")]
         public float netSettleDuration = 0.45f;
@@ -64,6 +73,13 @@ namespace ProjectX.ArcadeBasketball
         {
             moveDuration = Mathf.Max(0.05f, moveDuration);
             enterDistance = Mathf.Max(0f, enterDistance);
+            if (hoopYMax < hoopYMin)
+            {
+                float swap = hoopYMin;
+                hoopYMin = hoopYMax;
+                hoopYMax = swap;
+            }
+            hoopYStart = Mathf.Clamp(hoopYStart, hoopYMin, hoopYMax);
             netSettleDuration = Mathf.Max(0.05f, netSettleDuration);
             netStretch = Mathf.Max(0f, netStretch);
             netSquash = Mathf.Max(0f, netSquash);

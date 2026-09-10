@@ -1,0 +1,295 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1a2b3c4d5e60718293a4b5c6d7e8f03, type: 3}
+  m_Name: ArcadeAudioConfig
+  m_EditorClassIdentifier: ProjectX.ArcadeBasketball.ArcadeAudioConfig
+  masterMixDb: -2.5
+  musicMixDb: -10
+  sfxMixDb: 0
+  uiMixDb: -4
+  backgroundMusic: {fileID: 8300000, guid: ebfbf60e30bb2ed43b0296e5a6515e29, type: 3}
+  musicSourceVolume: 0.85
+  musicFadeInSeconds: 0.55
+  musicFadeOutSeconds: 0.4
+  rewardDuckDb: 3.5
+  duckAttackSeconds: 0.05
+  duckHoldSeconds: 0.32
+  duckReleaseSeconds: 0.38
+  normalScoreDelay: 0.045
+  cleanScoreDelay: 0.055
+  sfxPoolSize: 10
+  tap:
+    debugName: Tap
+    clips:
+    - {fileID: 8300000, guid: 6d58e0f2594cbe64288586dfc9a2faf1, type: 3}
+    - {fileID: 8300000, guid: a96efc096aa838746a63b7df77cb6573, type: 3}
+    - {fileID: 8300000, guid: dfb555c069f44ce4899a818e6f53071b, type: 3}
+    - {fileID: 8300000, guid: fbe22647fcbd4864dbba52e73f8ff5ba, type: 3}
+    volume: 0.8
+    pitchRange: {x: 0.97, y: 1.03}
+    cooldown: 0.045
+    maxSimultaneousInstances: 3
+    preventDuplicateClip: 1
+    mixerBus: 2
+    outputMixerGroup: {fileID: 24300004, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 0
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  bounce:
+    debugName: Bounce
+    clips:
+    - {fileID: 8300000, guid: c4e11a86b82480e429ba07ed1ec5a07e, type: 3}
+    - {fileID: 8300000, guid: a41b59b2e483e3340ad12f57e040925e, type: 3}
+    - {fileID: 8300000, guid: 57672ca76fae8dc49ae247605fcdff22, type: 3}
+    - {fileID: 8300000, guid: ef09cf028f9a91b4ebdbab831dc5a3c9, type: 3}
+    - {fileID: 8300000, guid: d4197979b0f7cd441b36011bbb563fd9, type: 3}
+    volume: 0.88
+    pitchRange: {x: 0.96, y: 1.04}
+    cooldown: 0.085
+    maxSimultaneousInstances: 2
+    preventDuplicateClip: 1
+    mixerBus: 2
+    outputMixerGroup: {fileID: 24300004, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 1
+    minimumCollisionVelocity: 0.75
+    maximumCollisionVelocity: 8
+    intensityVolume: {x: 0.55, y: 1}
+  rim:
+    debugName: Rim
+    clips:
+    - {fileID: 8300000, guid: 218716e9f58426d499fad047d7943eb4, type: 3}
+    volume: 0.9
+    pitchRange: {x: 0.97, y: 1.03}
+    cooldown: 0.08
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 3
+    outputMixerGroup: {fileID: 24300005, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 1
+    minimumCollisionVelocity: 0.55
+    maximumCollisionVelocity: 9
+    intensityVolume: {x: 0.6, y: 1}
+  backboard:
+    debugName: Backboard
+    clips:
+    - {fileID: 8300000, guid: d2dd67fa85b0b884db914770ef18786f, type: 3}
+    - {fileID: 8300000, guid: e8e21a402241d584ab3ec7d87f96b370, type: 3}
+    - {fileID: 8300000, guid: e8db5cddaf50bd745b894c660db945cc, type: 3}
+    volume: 0.85
+    pitchRange: {x: 0.98, y: 1.02}
+    cooldown: 0.09
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 3
+    outputMixerGroup: {fileID: 24300005, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 1
+    minimumCollisionVelocity: 0.55
+    maximumCollisionVelocity: 9
+    intensityVolume: {x: 0.55, y: 1}
+  swish:
+    debugName: Swish
+    clips:
+    - {fileID: 8300000, guid: ec0a2e94b993d274b9541586cc4fc682, type: 3}
+    - {fileID: 8300000, guid: 706adfc90311a214d8a1cfffc8904a34, type: 3}
+    - {fileID: 8300000, guid: f93a48899dfa04b4ca8142a91427011f, type: 3}
+    - {fileID: 8300000, guid: 85b1fc0239f465e43994f805962543fa, type: 3}
+    volume: 0.98
+    pitchRange: {x: 0.98, y: 1.02}
+    cooldown: 0.2
+    maxSimultaneousInstances: 2
+    preventDuplicateClip: 1
+    mixerBus: 4
+    outputMixerGroup: {fileID: 24300006, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 2
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  swishWhoosh:
+    debugName: Whoosh
+    clips:
+    - {fileID: 8300000, guid: 55534f4d75d1d0d47af66dccd694e9c5, type: 3}
+    volume: 0.5
+    pitchRange: {x: 1, y: 1}
+    cooldown: 0.2
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 4
+    outputMixerGroup: {fileID: 24300006, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 2
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  normalScore:
+    debugName: Score
+    clips:
+    - {fileID: 8300000, guid: 71a6320b4afc28f4fa9b89e1e8ffc866, type: 3}
+    volume: 0.9
+    pitchRange: {x: 0.99, y: 1.01}
+    cooldown: 0.25
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 5
+    outputMixerGroup: {fileID: 24300007, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 2
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  backboardScore:
+    debugName: BankScore
+    clips:
+    - {fileID: 8300000, guid: 5b18b0894edf96249a96994dbc435a08, type: 3}
+    volume: 0.88
+    pitchRange: {x: 0.99, y: 1.01}
+    cooldown: 0.25
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 5
+    outputMixerGroup: {fileID: 24300007, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 2
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  cleanScore:
+    debugName: Clean
+    clips:
+    - {fileID: 8300000, guid: 87c57cb8099a5054481eebae43856180, type: 3}
+    volume: 0.98
+    pitchRange: {x: 1, y: 1}
+    cooldown: 0.4
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 5
+    outputMixerGroup: {fileID: 24300007, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 3
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  comboLevel2:
+    debugName: Combo2
+    clips:
+    - {fileID: 8300000, guid: dcf0313df766c12448d736e91755d833, type: 3}
+    volume: 0.92
+    pitchRange: {x: 1, y: 1}
+    cooldown: 0.4
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 5
+    outputMixerGroup: {fileID: 24300007, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 3
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  comboLevel3:
+    debugName: Combo3
+    clips:
+    - {fileID: 8300000, guid: b5513e632ab9a934cb05dd7cae2b73f4, type: 3}
+    volume: 0.95
+    pitchRange: {x: 1, y: 1}
+    cooldown: 0.4
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 5
+    outputMixerGroup: {fileID: 24300007, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 3
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  comboHigh:
+    debugName: ComboHigh
+    clips:
+    - {fileID: 8300000, guid: b5513e632ab9a934cb05dd7cae2b73f4, type: 3}
+    volume: 0.98
+    pitchRange: {x: 1, y: 1}
+    cooldown: 0.45
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 5
+    outputMixerGroup: {fileID: 24300007, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 3
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  gameOver:
+    debugName: GameOver
+    clips:
+    - {fileID: 8300000, guid: 93ba7053b0ec41e46b399f5d61d1fe7a, type: 3}
+    volume: 0.92
+    pitchRange: {x: 1, y: 1}
+    cooldown: 1
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 5
+    outputMixerGroup: {fileID: 24300007, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 3
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  whistle:
+    debugName: Whistle
+    clips:
+    - {fileID: 8300000, guid: d94487649d95ea14690cfe92378c33bf, type: 3}
+    volume: 0.88
+    pitchRange: {x: 1, y: 1}
+    cooldown: 0.3
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 6
+    outputMixerGroup: {fileID: 24300008, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 2
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  buzzer:
+    debugName: Buzzer
+    clips:
+    - {fileID: 8300000, guid: b58e92c69d49647468a6e3844dff6b76, type: 3}
+    volume: 1
+    pitchRange: {x: 1, y: 1}
+    cooldown: 0.5
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 5
+    outputMixerGroup: {fileID: 24300007, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 3
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  hoopMove:
+    debugName: HoopMove
+    clips:
+    - {fileID: 8300000, guid: 55534f4d75d1d0d47af66dccd694e9c5, type: 3}
+    volume: 0.5
+    pitchRange: {x: 1, y: 1}
+    cooldown: 0.12
+    maxSimultaneousInstances: 1
+    preventDuplicateClip: 1
+    mixerBus: 6
+    outputMixerGroup: {fileID: 24300008, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 0
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}
+  uiButton:
+    debugName: UI
+    clips: []
+    volume: 0.7
+    pitchRange: {x: 1, y: 1}
+    cooldown: 0.05
+    maxSimultaneousInstances: 2
+    preventDuplicateClip: 1
+    mixerBus: 6
+    outputMixerGroup: {fileID: 24300008, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+    priority: 0
+    minimumCollisionVelocity: 0
+    maximumCollisionVelocity: 0
+    intensityVolume: {x: 0.4, y: 1}

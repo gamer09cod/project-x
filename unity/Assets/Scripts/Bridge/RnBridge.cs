@@ -47,8 +47,9 @@ namespace ProjectX.Bridge
 
             var host = new GameObject("BridgeHost");
             host.AddComponent<RnBridge>();
-            // BasketballRun is stub fallback when _Main Game scene is not loaded.
-            if (FindFirstObjectByType<Game>() == null)
+            // BasketballRun is stub fallback when neither arcade nor Main Game is loaded.
+            if (FindFirstObjectByType<Game>() == null
+                && FindFirstObjectByType<ProjectX.ArcadeBasketball.ArcadeRoundController>() == null)
             {
                 host.AddComponent<ProjectX.Gameplay.BasketballRun>();
             }
@@ -108,6 +109,8 @@ namespace ProjectX.Bridge
                 Game.Instance.CancelEmbedMatch();
             }
 
+            AbortArcadeRun();
+
             var stub = GetComponent<ProjectX.Gameplay.BasketballRun>();
             if (stub != null)
             {
@@ -153,7 +156,16 @@ namespace ProjectX.Bridge
             _runActive = true;
             _status = "run active · " + config.ClientRunId;
 
-            if (ProjectX.Gameplay.SwishShotRunHost.IsAvailable())
+            if (ProjectX.ArcadeBasketball.ArcadeRunHost.IsAvailable())
+            {
+                var arcade = GetComponent<ProjectX.ArcadeBasketball.ArcadeRunHost>();
+                if (arcade == null)
+                {
+                    arcade = gameObject.AddComponent<ProjectX.ArcadeBasketball.ArcadeRunHost>();
+                }
+                arcade.Begin(config, OnRunFinished);
+            }
+            else if (ProjectX.Gameplay.SwishShotRunHost.IsAvailable())
             {
                 var swish = GetComponent<ProjectX.Gameplay.SwishShotRunHost>();
                 if (swish == null)
@@ -177,6 +189,20 @@ namespace ProjectX.Bridge
                 EscapeJson(config.ClientRunId) +
                 "\"}";
             NativeApi.SendToMobileApp(ready);
+        }
+
+        void AbortArcadeRun()
+        {
+            var arcade = GetComponent<ProjectX.ArcadeBasketball.ArcadeRunHost>();
+            if (arcade != null)
+            {
+                arcade.Abort();
+                return;
+            }
+
+            var round = FindFirstObjectByType<ProjectX.ArcadeBasketball.ArcadeRoundController>();
+            if (round != null)
+                round.AbortRound();
         }
 
         void OnRunFinished(string scorePayloadEnvelope)

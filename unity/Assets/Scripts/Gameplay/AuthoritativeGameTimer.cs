@@ -54,7 +54,11 @@ namespace ProjectX.Gameplay
                 return;
             }
             long oldEnd = _presentationEndEpochMs;
-            _presentationEndEpochMs += bonusMs;
+            long now = GetEstimatedServerNowMs();
+            long remaining = _presentationEndEpochMs - now;
+            if (remaining < 0)
+                remaining = 0;
+            _presentationEndEpochMs = now + remaining + bonusMs;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log(
                 "[GameTimer] Extended oldEnd=" + oldEnd +

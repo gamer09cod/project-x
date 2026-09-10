@@ -14,6 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: ProjectX.ArcadeBasketball.HoopGameplayConfig
   moveDuration: 0.28
   enterDistance: 3.2
+  hoopYStart: 0.3
+  hoopYMin: 0.3
+  hoopYMax: 1
   netSettleDuration: 0.45
   netStretch: 0.22
   netSquash: 0.1

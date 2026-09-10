@@ -4,11 +4,14 @@ MonoImporter:
   externalObjects: {}
   serializedVersion: 2
   defaultReferences:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 11400000, guid: e0f5c3d46f708192a3b4c5d6e7f8091a, type: 2}
+  - ball: {fileID: 0}
+  - scoreDetector: {fileID: 0}
+  - hoop: {fileID: 0}
+  - round: {fileID: 0}
+  - gameplayConfig: {fileID: 11400000, guid: e0f5c3d46f708192a3b4c5d6e7f8091a, type: 2}
+  - audioConfig: {fileID: 11400000, guid: c1a2b3c4d5e60718293a4b5c6d7e8f21, type: 2}
+  - mixer: {fileID: 24100000, guid: c1a2b3c4d5e60718293a4b5c6d7e8f20, type: 2}
+  - source: {fileID: 0}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

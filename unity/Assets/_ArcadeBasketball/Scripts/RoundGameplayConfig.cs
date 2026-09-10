@@ -16,6 +16,15 @@ namespace ProjectX.ArcadeBasketball
         [Tooltip("Brief beat after the clock hits 0 before Results.")]
         public float roundEndingSeconds = 0.4f;
 
+        [Tooltip("Slow-mo scale while the ball is in the air at 0.0.")]
+        public float buzzerTimeScale = 0.25f;
+
+        [Tooltip("Seconds added once on a buzzer make. Must stay at 5 for payload duration caps.")]
+        public float buzzerBonusSeconds = 5f;
+
+        [Tooltip("Real-time cap on the slow-mo window so the clock cannot stall.")]
+        public float buzzerMaxSeconds = 8f;
+
         public static bool TryGet(
             RoundGameplayConfig config,
             Object context,
@@ -35,6 +44,9 @@ namespace ProjectX.ArcadeBasketball
             roundDuration = Mathf.Max(1f, roundDuration);
             countdownSeconds = Mathf.Max(0f, countdownSeconds);
             roundEndingSeconds = Mathf.Max(0f, roundEndingSeconds);
+            buzzerTimeScale = Mathf.Clamp(buzzerTimeScale, 0.05f, 1f);
+            buzzerBonusSeconds = Mathf.Clamp(buzzerBonusSeconds, 0f, 5f);
+            buzzerMaxSeconds = Mathf.Clamp(buzzerMaxSeconds, 1f, 15f);
         }
     }
 }

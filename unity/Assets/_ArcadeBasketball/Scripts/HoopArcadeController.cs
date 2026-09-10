@@ -5,12 +5,15 @@ namespace ProjectX.ArcadeBasketball
 {
     /// <summary>
     /// After a score and a floor bounce, the hoop slides in from off-screen
-    /// on the other side. It does not travel across the court.
+    /// on the other side at a random Y. It does not travel across the court.
     /// </summary>
     public sealed class HoopArcadeController : MonoBehaviour
     {
         /// <summary>Hoop started sliding in from off-screen.</summary>
         public event Action OnHoopMove;
+
+        /// <summary>Hoop finished sliding onto the new side.</summary>
+        public event Action OnRelocateComplete;
 
         [SerializeField]
         Transform hoop;
@@ -39,6 +42,7 @@ namespace ProjectX.ArcadeBasketball
         bool _pendingRelocation;
         bool _relocating;
         int _moveGen;
+        float _hoopY;
 
         void Awake()
         {
@@ -56,6 +60,9 @@ namespace ProjectX.ArcadeBasketball
             _round = GetComponent<ArcadeRoundController>();
 
             HoopGameplayConfig.TryGet(hoopConfig, this, out hoopConfig);
+            _atLeft = true;
+            ApplyStartHeight();
+            SnapToRest();
         }
 
         void OnEnable()
@@ -110,25 +117,30 @@ namespace ProjectX.ArcadeBasketball
             if (!HoopGameplayConfig.TryGet(hoopConfig, this, out HoopGameplayConfig config))
                 return;
 
-            Transform dest = _atLeft ? rightAnchor : leftAnchor;
+            Transform destAnchor = _atLeft ? rightAnchor : leftAnchor;
+            if (destAnchor == null || hoop == null)
+                return;
+
+            RollHoopY();
+            Vector3 dest = RestLocal(destAnchor);
             _relocating = true;
 
             LeanTween.cancel(hoop.gameObject);
 
             OnHoopMove?.Invoke();
 
-            hoop.localScale = dest.localScale;
+            hoop.localScale = destAnchor.localScale;
 
-            float fromXSign = dest.position.x >= 0f ? 1f : -1f;
-            Vector3 start = dest.position;
+            float fromXSign = dest.x >= 0f ? 1f : -1f;
+            Vector3 start = dest;
             start.x += fromXSign * config.enterDistance;
-            hoop.position = start;
+            hoop.localPosition = start;
 
             if (ball != null && hoopTarget != null)
                 ball.SetTargetHoop(hoopTarget);
 
             int gen = ++_moveGen;
-            LeanTween.move(hoop.gameObject, dest.position, config.moveDuration)
+            LeanTween.moveLocal(hoop.gameObject, dest, config.moveDuration)
                 .setEaseOutCubic()
                 .setOnComplete(() =>
                 {
@@ -143,21 +155,18 @@ namespace ProjectX.ArcadeBasketball
             _atLeft = !_atLeft;
             _relocating = false;
 
-            Transform rest = _atLeft ? leftAnchor : rightAnchor;
-            if (rest != null)
-            {
-                hoop.position = rest.position;
-                hoop.localScale = rest.localScale;
-            }
+            SnapToRest();
 
             if (ball != null && hoopTarget != null)
                 ball.SetTargetHoop(hoopTarget);
 
-            if (scoreDetector == null)
-                return;
+            if (scoreDetector != null)
+            {
+                scoreDetector.BeginNewCycle();
+                ApplyScoringLock();
+            }
 
-            scoreDetector.BeginNewCycle();
-            ApplyScoringLock();
+            OnRelocateComplete?.Invoke();
         }
 
         /// <summary>Cancel a slide and snap to the current side. Safe to call from BeginRound.</summary>
@@ -169,19 +178,67 @@ namespace ProjectX.ArcadeBasketball
 
             _pendingRelocation = false;
             _relocating = false;
-
-            Transform rest = _atLeft ? leftAnchor : rightAnchor;
-            if (hoop != null && rest != null)
-            {
-                hoop.position = rest.position;
-                hoop.localScale = rest.localScale;
-            }
+            _atLeft = true;
+            ApplyStartHeight();
+            SnapToRest();
 
             if (ball != null && hoopTarget != null)
                 ball.SetTargetHoop(hoopTarget);
 
             if (scoreDetector != null)
                 scoreDetector.BeginNewCycle();
+        }
+
+        void RollHoopY()
+        {
+            if (!HoopGameplayConfig.TryGet(hoopConfig, this, out HoopGameplayConfig config))
+                return;
+
+            float min = config.hoopYMin;
+            float max = config.hoopYMax;
+            if (max < min)
+            {
+                float swap = min;
+                min = max;
+                max = swap;
+            }
+
+            _hoopY = Mathf.Approximately(min, max) ? min : UnityEngine.Random.Range(min, max);
+        }
+
+        void ApplyStartHeight()
+        {
+            _hoopY = hoopConfig != null ? hoopConfig.hoopYStart : 0.3f;
+        }
+
+        void SnapToRest()
+        {
+            Transform rest = _atLeft ? leftAnchor : rightAnchor;
+            if (hoop == null || rest == null)
+                return;
+
+            hoop.localPosition = RestLocal(rest);
+            hoop.localScale = rest.localScale;
+        }
+
+        Vector3 RestLocal(Transform anchor)
+        {
+            if (anchor == null)
+                return default;
+
+            Vector3 local = anchor.localPosition;
+            local.y = _hoopY;
+            return local;
+        }
+
+        Vector3 RestPosition(Transform anchor)
+        {
+            if (anchor == null)
+                return default;
+
+            Vector3 local = RestLocal(anchor);
+            Transform parent = anchor.parent;
+            return parent != null ? parent.TransformPoint(local) : local;
         }
 
         void ApplyScoringLock()
@@ -202,9 +259,9 @@ namespace ProjectX.ArcadeBasketball
 
         public Vector3 DebugHoopPosition => hoop != null ? hoop.position : transform.position;
 
-        public Vector3 DebugLeftAnchor => leftAnchor != null ? leftAnchor.position : default;
+        public Vector3 DebugLeftAnchor => RestPosition(leftAnchor);
 
-        public Vector3 DebugRightAnchor => rightAnchor != null ? rightAnchor.position : default;
+        public Vector3 DebugRightAnchor => RestPosition(rightAnchor);
 
         public Vector3 DebugHoopTarget => hoopTarget != null ? hoopTarget.position : default;
 
@@ -220,9 +277,8 @@ namespace ProjectX.ArcadeBasketball
             _relocating = false;
             _atLeft = left;
 
-            Transform rest = _atLeft ? leftAnchor : rightAnchor;
-            hoop.position = rest.position;
-            hoop.localScale = rest.localScale;
+            RollHoopY();
+            SnapToRest();
 
             if (ball != null && hoopTarget != null)
                 ball.SetTargetHoop(hoopTarget);

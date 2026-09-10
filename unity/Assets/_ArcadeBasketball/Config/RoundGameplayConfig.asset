@@ -15,3 +15,6 @@ MonoBehaviour:
   roundDuration: 60
   countdownSeconds: 0
   roundEndingSeconds: 0.4
+  buzzerTimeScale: 0.25
+  buzzerBonusSeconds: 5
+  buzzerMaxSeconds: 8

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using ProjectX.Effect;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,11 +7,15 @@ namespace ProjectX.ArcadeBasketball
 {
     /// <summary>
     /// Arcade +1 popups and score HUD. Pooled. No physics. No Main ScoreFeedback / Game.
-    /// Canvas has no GraphicRaycaster so taps are not stolen.
+    /// Overlay canvas has no GraphicRaycaster so taps are not stolen.
+    /// Score and timer labels are authored in the scene, not created at runtime.
     /// </summary>
     public sealed class ArcadeScoreFeedback : MonoBehaviour
     {
         const int PoolSize = 8;
+        const float TimerWarnSeconds = 10f;
+        const float TimerCriticalSeconds = 3f;
+        static readonly Color TimerUrgent = new Color(1f, 0.18f, 0.18f, 1f);
 
         [SerializeField]
         Camera worldCamera;
@@ -25,12 +28,27 @@ namespace ProjectX.ArcadeBasketball
         [SerializeField]
         TMP_FontAsset popupFont;
 
+        [Tooltip("World-space countdown on timer-bg. Assigned in the scene, not created at runtime.")]
+        [SerializeField]
+        TextMeshProUGUI timerLabel;
+
+        [Tooltip("Overlay score readout. Assigned in the scene, not created at runtime.")]
+        [SerializeField]
+        TextMeshProUGUI scoreLabel;
+
+        [Tooltip("Safe-area root for pooled +N / SWISH popups.")]
+        [SerializeField]
+        RectTransform popupRoot;
+
         RectTransform _canvasRect;
         RectTransform _safeRect;
         TextMeshProUGUI _hud;
         TextMeshProUGUI _timer;
+        TextMeshProUGUI _buzzerCallout;
         Vector3 _hudRestScale = Vector3.one;
+        Vector3 _timerRestScale = Vector3.one;
         float _hudBump;
+        float _timerRemaining;
         int _shownTimer = int.MinValue;
         readonly List<ArcadeScorePopup> _free = new List<ArcadeScorePopup>(PoolSize);
         readonly List<ArcadeScorePopup> _all = new List<ArcadeScorePopup>(PoolSize);
@@ -40,7 +58,13 @@ namespace ProjectX.ArcadeBasketball
             if (worldCamera == null)
                 worldCamera = Camera.main;
 
-            BuildCanvas();
+            if (timerLabel == null)
+                Debug.LogError("ArcadeScoreFeedback: timerLabel is not assigned.", this);
+            _timer = timerLabel;
+            if (_timer != null)
+                _timerRestScale = _timer.rectTransform.localScale;
+
+            BindSceneHud();
             TMP_FontAsset popup = ResolveFont(popupFont);
             for (int i = 0; i < PoolSize; i++)
                 _free.Add(CreatePopup(i, popup));
@@ -48,20 +72,30 @@ namespace ProjectX.ArcadeBasketball
 
         void Update()
         {
-            if (_hud == null || _hudBump <= 0f)
-                return;
+            if (_hud != null && _hudBump > 0f)
+            {
+                _hudBump -= Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(_hudBump / 0.18f);
+                float scale = Mathf.Lerp(1f, 1.22f, t);
+                _hud.rectTransform.localScale = _hudRestScale * scale;
+            }
 
-            _hudBump -= Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(_hudBump / 0.18f);
-            float scale = Mathf.Lerp(1f, 1.22f, t);
-            _hud.rectTransform.localScale = _hudRestScale * scale;
+            PulseTimer();
         }
 
         public void ResetRound()
         {
             SetHud(0);
             SetTimer(0f);
+            SetBuzzerActive(false);
             StopAll();
+        }
+
+        public void SetBuzzerActive(bool active)
+        {
+            EnsureBuzzerCallout();
+            if (_buzzerCallout != null)
+                _buzzerCallout.gameObject.SetActive(active);
         }
 
         public void SetTimer(float remainingSeconds)
@@ -69,12 +103,49 @@ namespace ProjectX.ArcadeBasketball
             if (_timer == null)
                 return;
 
-            int seconds = Mathf.CeilToInt(Mathf.Max(0f, remainingSeconds));
+            _timerRemaining = Mathf.Max(0f, remainingSeconds);
+            int seconds = Mathf.CeilToInt(_timerRemaining);
             if (seconds == _shownTimer)
                 return;
 
             _shownTimer = seconds;
             _timer.text = seconds.ToString();
+        }
+
+        void PulseTimer()
+        {
+            if (_timer == null)
+                return;
+
+            if (_timerRemaining > TimerWarnSeconds)
+            {
+                _timer.color = Color.white;
+                _timer.rectTransform.localScale = _timerRestScale;
+                return;
+            }
+
+            _timer.color = TimerUrgent;
+            if (_timerRemaining <= 0f)
+            {
+                _timer.rectTransform.localScale = _timerRestScale;
+                return;
+            }
+
+            float pulseHz;
+            float pulseAmount;
+            if (_timerRemaining <= TimerCriticalSeconds && _timerRemaining > 0f)
+            {
+                pulseHz = 5f;
+                pulseAmount = 0.12f;
+            }
+            else
+            {
+                pulseHz = 3f;
+                pulseAmount = 0.08f;
+            }
+
+            float pulse = 1f + Mathf.Abs(Mathf.Sin(Time.unscaledTime * Mathf.PI * pulseHz)) * pulseAmount;
+            _timer.rectTransform.localScale = _timerRestScale * pulse;
         }
 
         static readonly Color PointsColor = Color.white;
@@ -135,68 +206,62 @@ namespace ProjectX.ArcadeBasketball
                 _hud.text = score.ToString();
         }
 
-        void BuildCanvas()
+        void BindSceneHud()
         {
-            var canvasGo = new GameObject("ArcadeScoreCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
-            canvasGo.transform.SetParent(transform, false);
+            if (scoreLabel == null)
+                Debug.LogError("ArcadeScoreFeedback: scoreLabel is not assigned.", this);
+            _hud = scoreLabel;
+            if (_hud != null)
+                _hudRestScale = _hud.rectTransform.localScale;
 
-            Canvas canvas = canvasGo.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 20;
+            if (popupRoot == null)
+                Debug.LogError("ArcadeScoreFeedback: popupRoot is not assigned.", this);
+            _safeRect = popupRoot;
 
-            CanvasScaler scaler = canvasGo.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 0.5f;
-
-            _canvasRect = canvasGo.GetComponent<RectTransform>();
-            _safeRect = CreateSafeArea(canvasGo.transform);
-
-            var rootGo = new GameObject("HudRoot", typeof(RectTransform));
-            rootGo.transform.SetParent(canvasGo.transform, false);
-            RectTransform root = rootGo.GetComponent<RectTransform>();
-            root.anchorMin = new Vector2(0.5f, 1f);
-            root.anchorMax = new Vector2(0.5f, 1f);
-            root.pivot = new Vector2(0.5f, 1f);
-            root.anchoredPosition = new Vector2(0f, -36f);
-            root.sizeDelta = new Vector2(620f, 300f);
-
-            HudSafeInset inset = rootGo.AddComponent<HudSafeInset>();
-            inset.extraPadding = new Vector2(12f, 16f);
-
-            TMP_FontAsset font = ResolveFont(hudFont);
-            _hud = CreateHudLabel(root, "ScoreHud", new Vector2(0f, 0f), new Vector2(620f, 180f), 140f, font);
-            _hud.text = "0";
-            _hudRestScale = _hud.rectTransform.localScale;
-
-            _timer = CreateHudLabel(root, "TimerHud", new Vector2(0f, -1065f), new Vector2(400f, 100f), 72f, font);
-            _timer.text = "0";
+            Canvas canvas = null;
+            if (_hud != null)
+                canvas = _hud.GetComponentInParent<Canvas>();
+            if (canvas == null && _safeRect != null)
+                canvas = _safeRect.GetComponentInParent<Canvas>();
+            _canvasRect = canvas != null ? canvas.transform as RectTransform : _safeRect;
+            EnsureBuzzerCallout();
         }
 
-        static TextMeshProUGUI CreateHudLabel(
-            Transform parent,
-            string name,
-            Vector2 anchoredPosition,
-            Vector2 size,
-            float fontSize,
-            TMP_FontAsset font)
+        void EnsureBuzzerCallout()
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            if (_buzzerCallout != null)
+                return;
+
+            Transform parent = _canvasRect != null ? _canvasRect : _safeRect;
+            if (parent == null)
+                return;
+
+            var go = new GameObject("BuzzerCallout", typeof(RectTransform), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
+
             RectTransform rect = go.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = anchoredPosition;
-            rect.sizeDelta = size;
+            rect.anchorMin = new Vector2(0.5f, 0.62f);
+            rect.anchorMax = new Vector2(0.5f, 0.62f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(920f, 140f);
+            rect.anchoredPosition = Vector2.zero;
 
             TextMeshProUGUI label = go.GetComponent<TextMeshProUGUI>();
-            ApplyFont(label, font);
+            TMP_FontAsset font = ResolveFont(hudFont);
+            if (font != null)
+            {
+                label.font = font;
+                if (font.material != null)
+                    label.fontSharedMaterial = font.material;
+            }
+
+            label.text = "Buzz Beater!";
+            label.fontSize = 72f;
             label.alignment = TextAlignmentOptions.Center;
-            label.fontSize = fontSize;
-            label.color = Color.white;
+            label.color = SwishColor;
             label.raycastTarget = false;
-            return label;
+            go.SetActive(false);
+            _buzzerCallout = label;
         }
 
         ArcadeScorePopup CreatePopup(int index, TMP_FontAsset font)
@@ -228,21 +293,6 @@ namespace ProjectX.ArcadeBasketball
         {
             if (popup != null && !_free.Contains(popup))
                 _free.Add(popup);
-        }
-
-        RectTransform CreateSafeArea(Transform canvas)
-        {
-            var safeGo = new GameObject("SafeArea", typeof(RectTransform));
-            safeGo.transform.SetParent(canvas, false);
-
-            RectTransform safeRect = safeGo.GetComponent<RectTransform>();
-            safeRect.anchorMin = Vector2.zero;
-            safeRect.anchorMax = Vector2.one;
-            safeRect.offsetMin = Vector2.zero;
-            safeRect.offsetMax = Vector2.zero;
-            safeRect.pivot = new Vector2(0.5f, 0.5f);
-            safeGo.AddComponent<SafeAreaPanel>();
-            return safeRect;
         }
 
         Vector2 WorldToCanvas(Vector3 worldPos)
@@ -294,15 +344,6 @@ namespace ProjectX.ArcadeBasketball
             if (popupFont != null)
                 return popupFont;
             return TMP_Settings.defaultFontAsset;
-        }
-
-        static void ApplyFont(TextMeshProUGUI label, TMP_FontAsset font)
-        {
-            if (label == null || font == null)
-                return;
-            label.font = font;
-            if (font.material != null)
-                label.fontSharedMaterial = font.material;
         }
     }
 }

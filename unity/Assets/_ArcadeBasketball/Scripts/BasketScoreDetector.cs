@@ -4,7 +4,9 @@ using UnityEngine;
 namespace ProjectX.ArcadeBasketball
 {
     /// <summary>
-    /// Scores a downward pass through Upper then Lower. Raises OnBasketScored; no UI.
+    /// Scores only a downward pass: Upper first, then Lower, vy &lt; 0.
+    /// A visit that hits Lower first (bottom-to-top) is blocked until the ball
+    /// leaves both triggers.
     /// </summary>
     public sealed class BasketScoreDetector : MonoBehaviour
     {
@@ -12,6 +14,7 @@ namespace ProjectX.ArcadeBasketball
         {
             Ready,
             UpperEntered,
+            BlockedFromBelow,
             Scored,
         }
 
@@ -89,16 +92,28 @@ namespace ProjectX.ArcadeBasketball
                 return;
 
             float vy = ballBody.linearVelocity.y;
+            bool clear = !_inUpper && !_inLower;
 
-            if (_state == CycleState.Scored)
+            if (_state == CycleState.Scored || _state == CycleState.BlockedFromBelow)
             {
-                if (!_inUpper && !_inLower)
+                if (clear)
                     _state = CycleState.Ready;
                 return;
             }
 
             if (_state == CycleState.Ready)
             {
+                if (!_inUpper && !_inLower)
+                    return;
+
+                // Lower first, or both while rising: this visit came from below.
+                bool fromBelow = _inLower && (!_inUpper || vy > 0f);
+                if (fromBelow)
+                {
+                    _state = CycleState.BlockedFromBelow;
+                    return;
+                }
+
                 if (_inUpper && vy < 0f)
                     _state = CycleState.UpperEntered;
             }
@@ -106,7 +121,7 @@ namespace ProjectX.ArcadeBasketball
             if (_state != CycleState.UpperEntered)
                 return;
 
-            if (!_inUpper && !_inLower)
+            if (clear)
             {
                 _state = CycleState.Ready;
                 return;
