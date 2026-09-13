@@ -1306,24 +1306,24 @@ The underlying scoring, wagering, async match flow, and server authority should 
 
 ### Decision
 
-Basketball scoring is intentionally simple for the MVP:
+Basketball scoring is **contact class**, not NBA court zones. A make is classified from what the ball touched on the way in. The table is locked and must match `shotLog[].pointsClaimed` and `BasketballGameplayConfig`:
 
 ```text
-Two-point basket  -> +2
-Three-point basket -> +3
+Make, no rim, no backboard (swish / Perfect)  -> +3
+Make, touched rim (rim wins if both rim + glass) -> +2
+Make, backboard only                          -> +1
+Miss                                          ->  0
 ```
 
-The score awarded depends on whether the made shot is a **two-pointer or three-pointer**, using the court/shooting-zone rules defined by the game.
+`+1` is a real score, not presentation-only. A clean bank that never hits iron awards **1** point. A rim graze on the way in awards **2**, even if the ball also hit glass. A swish awards **3**.
 
-A clean swish does **not** introduce an additional combo multiplier in the MVP. If the existing design distinguishes clean shots for presentation or a separately defined bonus, that behavior must remain explicit and must not be confused with the base two-point/three-point scoring values.
-
-The server-authoritative score pipeline remains the source of truth for the final submitted score.
+The HUD claimed `score` is the running sum of those values. The server reconstructs the same sum from `shotLog` and **does not** trust the claimed field. Combo multipliers are not part of the MVP.
 
 ### Why
 
-Using standard basketball point values makes the scoring immediately understandable and gives players a clear reason to attempt harder three-point shots. It also keeps the scoring system easy to validate, communicate, and balance.
+Contact-class scoring is what the arcade hoop already measures (perfect / rim / board). NBA +2/+3 would require a three-point line the current 2D court does not have, and would disagree with the locked verifier table `{1, 2, 3}` for makes.
 
-Adding combo multipliers would introduce unnecessary complexity to the scoring economy and make score validation harder to reason about.
+Keeping `+1` explicit avoids treating a bank as a miss or folding it into +2. The four outcomes stay easy to reconstruct, communicate, and anti-cheat.
 
 ---
 
@@ -1342,14 +1342,14 @@ Basket -> Combo x3
 Miss   -> Combo resets
 ```
 
-The future system should be evaluated separately from the base `+2 / +3` scoring rules and should be introduced only with explicit rules for:
+The future system should be evaluated separately from the base `+3 / +2 / +1 / 0` scoring rules and should be introduced only with explicit rules for:
 
 - How a combo is started
 - How consecutive nets are counted
 - What breaks the combo
 - Whether the combo affects score, time, or presentation
 - Maximum multiplier/cap
-- Interaction with swishes and three-pointers
+- Interaction with swishes, rim makes, and +1 banks
 
 For now, consecutive baskets may use stronger **visual/audio presentation** without changing the underlying score formula.
 
@@ -1364,14 +1364,16 @@ Successful actions should have progressively stronger feedback.
 Normal basket:
 
 ```text
-+2 / +3
++3  swish
++2  rim
++1  backboard
 ```
 
 Clean swish:
 
 ```text
 SWISH!
-+2 / +3
++3
 ```
 
 Important streak/milestone moments may use stronger screen-space feedback where appropriate.
@@ -1551,6 +1553,96 @@ Contextual feedback may be positioned relative to gameplay space, but it must be
 
 ---
 
+# Score payload and verification
+
+## 49. What the client sends
+
+### Decision
+
+Unity emits a bridge envelope. RN strips the envelope and forwards the inner **ScorePayloadV1** to `submitScore` **unchanged**. RN must not rescale points, rewrite `shotLog`, or invent a claimed score.
+
+Envelope:
+
+```text
+{ "v": 1, "type": "scorePayload", "payload": { ScorePayloadV1 } }
+```
+
+`submitScore` request: `{ matchId, scorePayload, idempotencyKey }`.
+
+ScorePayloadV1:
+
+```text
+schemaVersion          1
+score                  claimed total (untrusted)
+durationMs             elapsed ms from run start
+clockEndedAtMs         elapsed ms (arcade sets this equal to durationMs)
+hasUsedBuzzerBeater    once-per-run flag
+buzzerBeaterTriggered  true if the +5s window actually opened
+shotLog[]              { tMs, result: "make"|"miss", pointsClaimed }
+clientRunId            UUID from startRun / join
+unityBuildId           baked export id
+```
+
+Each `shotLog` row uses the §39 table:
+
+```text
+make + swish     pointsClaimed = 3
+make + rim       pointsClaimed = 2
+make + backboard pointsClaimed = 1
+miss             pointsClaimed = 0
+tMs              integer ms from run start, non-decreasing
+```
+
+Claimed `score` must equal the sum of `pointsClaimed`. Settlement uses the reconstructed sum, not the claimed field.
+
+### Why
+
+The device owns the run; the server owns money. A single frozen schema lets Unity, RN, and Functions agree without a second scoring language.
+
+---
+
+## 50. Backend verification
+
+### Decision
+
+`submitScore` is two layers. The callable also requires a Firebase ID token, App Check, a **running** seat, and arrival before `score_deadline_at` (`started_at + 75s`). Late submit → `ignored_deadline`; the cron already wrote score **0**.
+
+**Parse (hard reject).** Bad shape throws `HttpsError`. The run is **not** zeroed.
+
+- `schemaVersion` must be `1`
+- `score`, `durationMs`, `clockEndedAtMs` non-negative integers
+- buzzer flags booleans
+- `clientRunId` UUID, `unityBuildId` non-empty
+- `shotLog` an array (max 2000), each row `tMs >= 0`, `result` `make`|`miss`, integer `pointsClaimed >= 0`
+
+**Verify (fail → accepted score 0).** The raw blob is still stored. `acceptedScore` is the sum of `pointsClaimed` when checks pass.
+
+Deterministic zeros:
+
+```text
+clientRunId ≠ seat bound id                 -> client_run_id_mismatch
+triggered without hasUsedBuzzerBeater       -> buzzer_flag_inconsistent
+durationMs > 67s (60 + 5 + 2 slack)         -> duration_exceeds_max
+durationMs > 62s and no buzzer flag         -> duration_exceeds_run_without_buzzer
+shotLog tMs decreases                       -> shot_log_not_monotone
+shot tMs > durationMs                       -> shot_time_past_duration
+miss with points ≠ 0                        -> miss_points_nonzero
+make with points not in {1, 2, 3}           -> make_points_not_in_table
+claimed score ≠ sum(pointsClaimed)          -> score_mismatch_vs_shot_log
+unityBuildId not on UNITY_BUILD_ALLOWLIST   -> unity_build_not_allowlisted
+  (only if that env var is set)
+```
+
+`{1, 2, 3}` is the make table: **+1 backboard, +2 rim, +3 swish**. A make of `4` or a miss of `1` zeros the run.
+
+**Plausibility is shadow-only** unless `SCORE_PLAUSIBILITY_ENFORCE=1`. Signals (sub-350ms gaps, too many shots, >90% perfects, robot-flat timing, long run with no late make) are stored on `match_players.score_plausibility` and logged. They do not change the accepted score today.
+
+### Why
+
+Schema reject vs check-fail-to-zero keeps a malformed client from looking like a scored 0, while a cheat-shaped but well-typed payload still settles (as 0) so the opponent is not stuck. Reconstructing from `shotLog` — including **+1** banks — is the only number money may use.
+
+---
+
 # Summary of Matchmaking, Rating, Timer, and Presentation Decisions
 
 | Decision | Choice |
@@ -1586,7 +1678,12 @@ Contextual feedback may be positioned relative to gameplay space, but it must be
 | Buzzer-beater | Once per run; clock 0 + live ball |
 | Buzzer make | +5s presentation; flags set |
 | Buzzer miss / timeout | Run ends |
-| Scoring | Two-pointer +2; three-pointer +3 |
+| Scoring | Swish +3; rim +2; backboard +1; miss 0 |
+| Score payload | ScorePayloadV1; RN forwards Unity JSON unchanged |
+| Score authority | Server reconstructs sum of shotLog.pointsClaimed |
+| Schema-invalid payload | Reject callable (no zero) |
+| Check-fail payload | acceptedScore 0; blob stored |
+| Plausibility signals | Shadow unless SCORE_PLAUSIBILITY_ENFORCE=1 |
 | MVP combo scoring | None |
 | Future combos | Consecutive nets may introduce combos later |
 | Juice priority | Art, feedback, VFX/audio/haptics, pacing |
@@ -1628,6 +1725,9 @@ Contextual feedback may be positioned relative to gameplay space, but it must be
 | Streak score authority | Server |
 | Streak settlement | Atomic and idempotent |
 | Streak + 1v1 Boost | No automatic application |
+| Scoring | Swish +3; rim +2; backboard +1; miss 0 |
+| Score payload | ScorePayloadV1; RN forwards unchanged |
+| Score verification | Reconstruct shotLog; schema reject vs check-fail→0 |
 | Input | Tap-to-lift; one Began tap; set Y + X toward hoop |
 | Basket direction | Downward only |
 | Buzzer-beater | Once per run; +5s on make; miss ends the run |
