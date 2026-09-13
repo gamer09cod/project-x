@@ -42,16 +42,19 @@ namespace ProjectX.ArcadeBasketball
         public float groundBounciness = 0.55f;
 
         [Tooltip("Cap on bounce-up speed after a floor hit. Independent of tap cap.")]
-        public float maxBounceSpeed = 7.5f;
+        public float maxBounceSpeed = 6.5f;
 
         [Tooltip("Landings slower than this (positive) settle instead of bouncing.")]
-        public float groundRestSpeed = 3.2f;
+        public float groundRestSpeed = 2.8f;
 
-        [Tooltip("Rolling slowdown on the floor (units/s²). ~2 lets it roll a beat then settle. Air X still coasts.")]
-        public float groundDrag = 2f;
+        [Tooltip("Rolling slowdown on the floor (units/s²). Air X still coasts.")]
+        public float groundDrag = 12f;
 
         [Tooltip("Snap floor X to 0 when slower than this.")]
-        public float groundStopSpeed = 0.05f;
+        public float groundStopSpeed = 0.12f;
+
+        [Tooltip("0–1 of horizontal speed removed on each floor impact.")]
+        public float groundBounceFriction = 0.35f;
 
         [Tooltip("Play floor SFX when inbound fall speed is at least this.")]
         public float groundSfxMinIncoming = 0.75f;
@@ -59,12 +62,22 @@ namespace ProjectX.ArcadeBasketball
         [Tooltip("Re-arm a floor impact if the ball is moving up this fast while still overlapping.")]
         public float floorStayReArmY = 0.25f;
 
+        [Header("Hoop bounce")]
+        [Tooltip("Restitution on glass. Ball material bounce is 0 so the floor can be scripted; backboard bounce is applied in code.")]
+        public float backboardBounciness = 0.88f;
+
+        [Tooltip("Restitution on the rim. Lower than glass so iron eats more speed.")]
+        public float rimBounciness = 0.65f;
+
+        [Tooltip("0–1 tangent damping on a rim/backboard hit. 0 = keep slide, 1 = kill slide.")]
+        public float hoopBounceFriction = 0.08f;
+
         [Header("Collision steering")]
-        [Tooltip("Blend toward hoop X on tap after a rim/backboard hit. 1 = full tap X, 0.25 keeps most of the bounce.")]
-        public float collisionSteeringMultiplier = 0.3f;
+        [Tooltip("Blend toward hoop X on tap after a rim/backboard hit. 0 keeps the bounce X; 1 replaces it with tap X.")]
+        public float collisionSteeringMultiplier = 0f;
 
         [Tooltip("Seconds to keep reduced steering after a hit. Refresh on repeat hits.")]
-        public float collisionSteeringDuration = 0.16f;
+        public float collisionSteeringDuration = 0.55f;
 
         [Tooltip("Ignore glancing hits below this |linearVelocity| for steering suppression.")]
         public float minimumCollisionSpeedForSuppression = 0.5f;
@@ -156,8 +169,12 @@ namespace ProjectX.ArcadeBasketball
             groundRestSpeed = Mathf.Max(0f, groundRestSpeed);
             groundDrag = Mathf.Max(0f, groundDrag);
             groundStopSpeed = Mathf.Max(0f, groundStopSpeed);
+            groundBounceFriction = Mathf.Clamp01(groundBounceFriction);
             groundSfxMinIncoming = Mathf.Max(0f, groundSfxMinIncoming);
             floorStayReArmY = Mathf.Max(0f, floorStayReArmY);
+            backboardBounciness = Mathf.Clamp01(backboardBounciness);
+            rimBounciness = Mathf.Clamp01(rimBounciness);
+            hoopBounceFriction = Mathf.Clamp01(hoopBounceFriction);
             collisionSteeringMultiplier = Mathf.Max(0f, collisionSteeringMultiplier);
             collisionSteeringDuration = Mathf.Max(0f, collisionSteeringDuration);
             minimumCollisionSpeedForSuppression = Mathf.Max(0f, minimumCollisionSpeedForSuppression);

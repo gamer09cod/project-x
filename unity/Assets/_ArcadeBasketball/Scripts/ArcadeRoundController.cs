@@ -149,6 +149,7 @@ namespace ProjectX.ArcadeBasketball
                 scoreDetector.OnBasketScored += HandleBasketScored;
             if (ball != null)
             {
+                ball.OnGroundHit += HandleGroundHit;
                 ball.OnGroundSettled += HandleGroundSettled;
                 ball.OnRecovered += HandleRecovered;
                 ball.OnTapApplied += HandleTapApplied;
@@ -163,6 +164,7 @@ namespace ProjectX.ArcadeBasketball
                 scoreDetector.OnBasketScored -= HandleBasketScored;
             if (ball != null)
             {
+                ball.OnGroundHit -= HandleGroundHit;
                 ball.OnGroundSettled -= HandleGroundSettled;
                 ball.OnRecovered -= HandleRecovered;
                 ball.OnTapApplied -= HandleTapApplied;
@@ -331,6 +333,8 @@ namespace ProjectX.ArcadeBasketball
             State = ArcadeRoundState.RoundEnding;
             _phaseSecondsLeft = roundConfig != null ? roundConfig.roundEndingSeconds : 0.4f;
             ApplyInputAndScoring(false);
+            if (scoreFeedback != null)
+                scoreFeedback.ShowGameOver();
             OnRoundEnding?.Invoke();
         }
 
@@ -449,6 +453,15 @@ namespace ProjectX.ArcadeBasketball
             _localElapsedMs = 0f;
         }
 
+        void HandleGroundHit()
+        {
+            if (!_buzzerActive)
+                return;
+
+            TryLogMiss();
+            FinishFromClock();
+        }
+
         void HandleGroundSettled()
         {
             TryLogMiss();
@@ -522,7 +535,7 @@ namespace ProjectX.ArcadeBasketball
             if (_buzzerActive)
                 return;
 
-            if (BallIsLive() && CanScoreThisPossession())
+            if (!HasUsedBuzzerBeater && BallIsLive() && CanScoreThisPossession())
             {
                 BeginBuzzer();
                 return;
@@ -547,6 +560,9 @@ namespace ProjectX.ArcadeBasketball
 
         void BeginBuzzer()
         {
+            if (_buzzerActive || HasUsedBuzzerBeater)
+                return;
+
             _buzzerActive = true;
             _buzzerUnscaled = 0f;
             RemainingSeconds = 0f;

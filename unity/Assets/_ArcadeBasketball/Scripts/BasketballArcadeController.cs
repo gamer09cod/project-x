@@ -494,8 +494,10 @@ namespace ProjectX.ArcadeBasketball
                 _hitRim = true;
 
             float impactSpeed = Mathf.Max(
-                _body != null ? _body.linearVelocity.magnitude : 0f,
+                _velocityBeforePhysics.magnitude,
                 collision.relativeVelocity.magnitude);
+
+            ApplyHoopBounce(collision, solid.Kind);
             OnHoopSolidHit?.Invoke(solid.Kind, impactSpeed);
 
             if (!gameplayConfig)
@@ -506,6 +508,51 @@ namespace ProjectX.ArcadeBasketball
 
             // Refresh, do not stack — another hit extends from now, not from leftover time.
             _steeringSuppressedUntil = Time.time + gameplayConfig.collisionSteeringDuration;
+        }
+
+        void ApplyHoopBounce(Collision2D collision, HoopSolidKind kind)
+        {
+            if (_body == null || gameplayConfig == null)
+                return;
+            if (collision.contactCount < 1)
+                return;
+
+            Vector2 normal = collision.GetContact(0).normal;
+            if (normal.sqrMagnitude < 0.0001f)
+                return;
+            normal.Normalize();
+
+            Vector2 inbound = _velocityBeforePhysics;
+            float intoSurface = Vector2.Dot(inbound, normal);
+            if (intoSurface >= 0f)
+                return;
+
+            float restitution = kind == HoopSolidKind.Backboard
+                ? BackboardRestitution(inbound, intoSurface)
+                : gameplayConfig.rimBounciness;
+
+            Vector2 velocity = inbound - (1f + restitution) * intoSurface * normal;
+            Vector2 tangent = new Vector2(-normal.y, normal.x);
+            float slide = Vector2.Dot(velocity, tangent);
+            slide *= 1f - gameplayConfig.hoopBounceFriction;
+            velocity = normal * Vector2.Dot(velocity, normal) + tangent * slide;
+
+            _body.linearVelocity = velocity;
+            _velocityBeforePhysics = velocity;
+        }
+
+        float BackboardRestitution(Vector2 inbound, float intoSurface)
+        {
+            float baseE = gameplayConfig.backboardBounciness;
+            float speed = inbound.magnitude;
+            float headOn = speed > 0.0001f
+                ? Mathf.Clamp01(-intoSurface / speed)
+                : 1f;
+
+            // Graze (0): keep a bankable bounce. Head-on (1): extra kick-out.
+            float bank = baseE * 0.7f;
+            float kick = Mathf.Min(1f, baseE * 1.15f);
+            return Mathf.Lerp(bank, kick, headOn * headOn);
         }
 
         void ApplyGroundBounce()
@@ -519,6 +566,10 @@ namespace ProjectX.ArcadeBasketball
             float incomingDown = Mathf.Max(0f, -_velocityBeforePhysics.y);
             Vector2 velocity = _body.linearVelocity;
             bool playSfx = incomingDown >= gameplayConfig.groundSfxMinIncoming;
+
+            velocity.x *= 1f - gameplayConfig.groundBounceFriction;
+            if (Mathf.Abs(velocity.x) < gameplayConfig.groundStopSpeed)
+                velocity.x = 0f;
 
             if (incomingDown < gameplayConfig.groundRestSpeed)
             {
