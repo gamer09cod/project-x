@@ -10,14 +10,15 @@
   },
   "scripts": {
     "start": "react-native start",
-    "android": "node ../scripts/patch-azesmway-unity.js && react-native run-android",
+    "android": "node ../scripts/patch-azesmway-unity.js && node ../scripts/patch-unity-android-manifest.js && react-native run-android",
     "android:apk": "node ../scripts/android-assemble-release.js",
     "android:keystore": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/new-android-release-keystore.ps1",
     "ios": "react-native run-ios",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "jest",
-    "patch:azesmway": "node ../scripts/patch-azesmway-unity.js"
+    "patch:azesmway": "node ../scripts/patch-azesmway-unity.js",
+    "patch:unity-manifest": "node ../scripts/patch-unity-android-manifest.js"
   },
   "dependencies": {
     "@azesmway/react-native-unity": "1.1.1",

@@ -29,7 +29,7 @@ export type JoinMatchResponse = {
   matchStatus: Extract<MatchStatus, "live" | "paired">;
   stakeCents: Cents;
   startedAt: IsoTimestamp;
-  /** Submit/crash-scum window (started_at + 75s). Not the play clock. */
+  /** Submit/crash-scum window (started_at + 100s). Not the play clock. */
   scoreDeadlineAt: IsoTimestamp;
 } & GameTimerEpochs & {
   boostId: Uuid | null;

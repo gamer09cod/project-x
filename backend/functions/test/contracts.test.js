@@ -20,21 +20,23 @@ function exportedNumber(src, name) {
 describe('score clocks', () => {
   const src = read('packages/shared/src/score-payload.ts');
 
-  it('locks run + buzzer + slack = 67000 and submit window 75s', () => {
+  it('locks run + window + bonus + slack = 75000 and submit window 100s', () => {
     const run = exportedNumber(src, 'RUN_DURATION_MS');
+    const window = exportedNumber(src, 'BUZZER_WINDOW_MS');
     const buzzer = exportedNumber(src, 'BUZZER_BEATER_BONUS_MS');
     const slack = exportedNumber(src, 'SCORE_DURATION_SLACK_MS');
     const submit = exportedNumber(src, 'SCORE_SUBMIT_WINDOW_MS');
 
     assert.equal(run, 60_000);
+    assert.equal(window, 8_000);
     assert.equal(buzzer, 5_000);
     assert.equal(slack, 2_000);
-    assert.equal(run + buzzer + slack, 67_000);
+    assert.equal(run + window + buzzer + slack, 75_000);
     assert.match(
       src,
-      /export const MAX_DURATION_MS =\s*RUN_DURATION_MS \+ BUZZER_BEATER_BONUS_MS \+ SCORE_DURATION_SLACK_MS/,
+      /export const MAX_DURATION_MS =\s*RUN_DURATION_MS \+\s*BUZZER_WINDOW_MS \+\s*BUZZER_BEATER_BONUS_MS \+\s*SCORE_DURATION_SLACK_MS/,
     );
-    assert.equal(submit, 75_000);
+    assert.equal(submit, 100_000);
     assert.match(src, /export const MATCHMAKING_TIMEOUT_MS = 15 \* 60 \* 1000/);
   });
 

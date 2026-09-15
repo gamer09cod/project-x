@@ -38,7 +38,7 @@ export type StreakRunResponse = {
   /** Wall-clock deadline; unfinished legs after this → forfeit, no refund. */
   expiresAt: IsoTimestamp;
   startedAt: IsoTimestamp;
-  /** Submit window (started_at + 75s). */
+  /** Submit window (started_at + 100s). */
   scoreDeadlineAt: IsoTimestamp;
   walletBalanceCents: Cents;
 } & GameTimerEpochs;

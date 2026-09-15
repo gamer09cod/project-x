@@ -109,6 +109,7 @@ namespace ProjectX.ArcadeBasketball
         bool _missArmed;
         bool _buzzerActive;
         float _buzzerUnscaled;
+        bool _buzzerBonusGranted;
         readonly List<ArcadeShotLogEntry> _shotLog = new List<ArcadeShotLogEntry>(64);
 
         void Awake()
@@ -565,6 +566,9 @@ namespace ProjectX.ArcadeBasketball
 
             _buzzerActive = true;
             _buzzerUnscaled = 0f;
+            // Opening the window consumes the once-per-run opportunity (make or miss).
+            HasUsedBuzzerBeater = true;
+            BuzzerBeaterTriggered = true;
             RemainingSeconds = 0f;
             RestoreTimeScale();
             if (scoreFeedback != null)
@@ -580,7 +584,7 @@ namespace ProjectX.ArcadeBasketball
             if (!_buzzerActive)
                 return;
 
-            if (!HasUsedBuzzerBeater)
+            if (!_buzzerBonusGranted)
             {
                 GrantBuzzerBonus();
                 return;
@@ -591,6 +595,7 @@ namespace ProjectX.ArcadeBasketball
 
         void GrantBuzzerBonus()
         {
+            _buzzerBonusGranted = true;
             HasUsedBuzzerBeater = true;
             BuzzerBeaterTriggered = true;
             _buzzerActive = false;
@@ -633,6 +638,7 @@ namespace ProjectX.ArcadeBasketball
             {
                 HasUsedBuzzerBeater = false;
                 BuzzerBeaterTriggered = false;
+                _buzzerBonusGranted = false;
             }
 
             if (!IsPaused)

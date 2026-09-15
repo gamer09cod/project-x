@@ -1255,14 +1255,14 @@ AND hoop is not relocating
 Enter buzzer window
 (slow-mo, "Buzz Beater!" callout, clock shows 0)
         |
-        +-- make --> +5s once, flags set, window ends, play continues
+        +-- make --> +5s once, flags already set on window open, window ends, play continues
         |
         +-- miss / floor / recover / window timeout --> run ends
 ```
 
 If the clock hits 0 and the ball is not live, or the hoop is moving, the run ends immediately. A second clock-zero after the bonus does not grant another +5s.
 
-The +5s extends the **presentation** deadline only. The client cannot grant itself extra time. The server validates once-only via `hasUsedBuzzerBeater` / `buzzerBeaterTriggered` and the duration cap. Visual slow-mo must not create extra authoritative time.
+The +5s extends the **presentation** deadline only. The client cannot grant itself extra time. Opening the buzzer window sets `hasUsedBuzzerBeater` and `buzzerBeaterTriggered` (once). The server validates once-only via those flags and the duration cap (`MAX_DURATION_MS` includes the window). Visual slow-mo must not create extra authoritative time.
 
 ### Why
 
@@ -1605,7 +1605,7 @@ The device owns the run; the server owns money. A single frozen schema lets Unit
 
 ### Decision
 
-`submitScore` is two layers. The callable also requires a Firebase ID token, App Check, a **running** seat, and arrival before `score_deadline_at` (`started_at + 75s`). Late submit → `ignored_deadline`; the cron already wrote score **0**.
+`submitScore` is two layers. The callable also requires a Firebase ID token, App Check, a **running** seat, and arrival before `score_deadline_at` (`started_at + 100s`). Late submit → `ignored_deadline`; the cron already wrote score **0**.
 
 **Parse (hard reject).** Bad shape throws `HttpsError`. The run is **not** zeroed.
 
@@ -1622,7 +1622,7 @@ Deterministic zeros:
 ```text
 clientRunId ≠ seat bound id                 -> client_run_id_mismatch
 triggered without hasUsedBuzzerBeater       -> buzzer_flag_inconsistent
-durationMs > 67s (60 + 5 + 2 slack)         -> duration_exceeds_max
+durationMs > 75s (60 + 8 window + 5 + 2)    -> duration_exceeds_max
 durationMs > 62s and no buzzer flag         -> duration_exceeds_run_without_buzzer
 shotLog tMs decreases                       -> shot_log_not_monotone
 shot tMs > durationMs                       -> shot_time_past_duration
@@ -1634,6 +1634,8 @@ unityBuildId not on UNITY_BUILD_ALLOWLIST   -> unity_build_not_allowlisted
 ```
 
 `{1, 2, 3}` is the make table: **+1 backboard, +2 rim, +3 swish**. A make of `4` or a miss of `1` zeros the run.
+
+Opening the buzzer window sets both `hasUsedBuzzerBeater` and `buzzerBeaterTriggered` (make or miss). A make still grants +5s once.
 
 **Plausibility is shadow-only** unless `SCORE_PLAUSIBILITY_ENFORCE=1`. Signals (sub-350ms gaps, too many shots, >90% perfects, robot-flat timing, long run with no late make) are stored on `match_players.score_plausibility` and logged. They do not change the accepted score today.
 

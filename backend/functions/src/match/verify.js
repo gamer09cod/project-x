@@ -9,10 +9,14 @@
 const { fail, isUuid } = require('../auth');
 
 const RUN_DURATION_MS = 60_000;
+const BUZZER_WINDOW_MS = 8_000;
 const BUZZER_BEATER_BONUS_MS = 5_000;
 const SCORE_DURATION_SLACK_MS = 2_000;
 const MAX_DURATION_MS =
-  RUN_DURATION_MS + BUZZER_BEATER_BONUS_MS + SCORE_DURATION_SLACK_MS;
+  RUN_DURATION_MS +
+  BUZZER_WINDOW_MS +
+  BUZZER_BEATER_BONUS_MS +
+  SCORE_DURATION_SLACK_MS;
 
 /** Locked to Swish Shot game_config: Perfect 3 / Hoop 2 / Backboard 1 / miss 0. */
 const MAKE_POINTS_ALLOWED = new Set([1, 2, 3]);
@@ -373,6 +377,7 @@ module.exports = {
   loadUnityBuildAllowlist,
   MAX_DURATION_MS,
   RUN_DURATION_MS,
+  BUZZER_WINDOW_MS,
   BUZZER_BEATER_BONUS_MS,
   SCORE_DURATION_SLACK_MS,
   MAKE_POINTS_ALLOWED,

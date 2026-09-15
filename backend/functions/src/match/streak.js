@@ -935,7 +935,7 @@ async function resolveStreakAfterScore(client, match, actingUserId, acceptedScor
     };
   }
 
-  // Mid-streak: wait for continueStreak (lazy next leg — no 75s clock yet).
+  // Mid-streak: wait for continueStreak (lazy next leg — no 100s clock yet).
   const nextLeg = leg + 1;
   const scoreCol = `leg_score_${leg}`;
   await client.query(

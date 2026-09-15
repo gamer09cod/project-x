@@ -2,7 +2,7 @@
 
 /**
  * Play-clock epochs derived from match_players.started_at.
- * Distinct from score_deadline_at (started_at + 75s submit window).
+ * Distinct from score_deadline_at (started_at + 100s submit window).
  * Mirrors packages/shared RUN_DURATION_MS — do not accept client duration.
  */
 const RUN_DURATION_MS = 60_000;

@@ -12,7 +12,7 @@ const { closeBoostReservation } = require('./boosts');
 const { zeroPlayerScore } = require('./submit');
 
 /**
- * Zero running players past score_deadline_at (75s disconnect path).
+ * Zero running players past score_deadline_at (100s disconnect path).
  * @returns {Promise<{ zeroed: number }>}
  */
 async function runZeroExpiredScores() {

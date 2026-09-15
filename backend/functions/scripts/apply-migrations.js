@@ -16,6 +16,7 @@ const FILES = [
   '20260905120000_prize_boost_promo.sql',
   '20260906120000_streak_resume.sql',
   '20260907120000_score_plausibility.sql',
+  '20260915120000_score_deadline_100s.sql',
 ];
 
 function loadDotEnv(filePath) {

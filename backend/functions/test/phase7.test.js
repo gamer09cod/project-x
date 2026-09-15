@@ -152,4 +152,41 @@ describe('verifyScorePayload', () => {
     assert.equal(result.acceptedScore, 3);
     assert.equal(result.checkFailed, false);
   });
+
+  it('accepts buzzer-window miss under MAX when flags set on open', () => {
+    const parsed = parseScorePayload(
+      validPayload({
+        durationMs: 68_000,
+        clockEndedAtMs: 68_000,
+        hasUsedBuzzerBeater: true,
+        buzzerBeaterTriggered: true,
+        score: 0,
+        shotLog: [{ tMs: 61_000, result: 'miss', pointsClaimed: 0 }],
+      }),
+    );
+    const result = verifyScorePayload(parsed, {
+      boundClientRunId: CLIENT_RUN,
+      unityBuildAllowlist: null,
+    });
+    assert.equal(result.acceptedScore, 0);
+    assert.equal(result.checkFailed, false);
+  });
+
+  it('zeros long run without buzzer flags', () => {
+    const parsed = parseScorePayload(
+      validPayload({
+        durationMs: 68_000,
+        clockEndedAtMs: 68_000,
+        hasUsedBuzzerBeater: false,
+        buzzerBeaterTriggered: false,
+        score: 0,
+        shotLog: [],
+      }),
+    );
+    const result = verifyScorePayload(parsed, {
+      boundClientRunId: null,
+      unityBuildAllowlist: null,
+    });
+    assert.equal(result.failReason, 'duration_exceeds_run_without_buzzer');
+  });
 });

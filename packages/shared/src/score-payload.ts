@@ -1,14 +1,21 @@
 /**
  * Clock bounds for a single run. Locked in Step 3 (DECISIONS.md C1).
- * durationMs on a valid payload must be <= RUN + optional buzzer-beater + slack.
+ * durationMs on a valid payload must be <= RUN + buzzer window + optional +5s + slack.
+ * Honest wall time can include waiting in the buzzer window (miss) or window + bonus (make).
  */
 export const RUN_DURATION_MS = 60_000;
+/** Max unscaled seconds the client may wait in the buzzer window before miss/timeout. */
+export const BUZZER_WINDOW_MS = 8_000;
 export const BUZZER_BEATER_BONUS_MS = 5_000;
 export const SCORE_DURATION_SLACK_MS = 2_000;
 export const MAX_DURATION_MS =
-  RUN_DURATION_MS + BUZZER_BEATER_BONUS_MS + SCORE_DURATION_SLACK_MS;
+  RUN_DURATION_MS +
+  BUZZER_WINDOW_MS +
+  BUZZER_BEATER_BONUS_MS +
+  SCORE_DURATION_SLACK_MS;
 
-export const SCORE_SUBMIT_WINDOW_MS = 75_000;
+/** started_at → score_deadline_at. Covers max play + submit latency. */
+export const SCORE_SUBMIT_WINDOW_MS = 100_000;
 export const MATCHMAKING_TIMEOUT_MS = 15 * 60 * 1000;
 
 export const SCORE_PAYLOAD_SCHEMA_VERSION = 1;
